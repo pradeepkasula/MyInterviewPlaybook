@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boot Fundamentals and Auto-configuration Interview Questions | My Interview Playbook</title>
+<meta name="description" content="What Spring Boot adds, starters, how auto-configuration and startup work, embedded servers, custom starters and Boot 3 migration.">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/qa.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+<button class="menu-btn" id="menuBtn" aria-label="Toggle contents" aria-expanded="false">Contents</button>
+<aside class="sidebar" id="sidebar">
+  <a class="back" href="../">&larr; Spring Boot track</a>
+  <p class="side-title">On this page</p>
+  <nav>
+<a href="#top-of-page">Overview</a>
+<a href="#beginner">Beginner <span class="cnt">3</span></a>
+<a href="#intermediate">Intermediate <span class="cnt">4</span></a>
+<a href="#experienced">Experienced <span class="cnt">3</span></a>
+  </nav>
+  <p class="side-title" style="margin-top:20px">Spring Boot topics</p>
+  <nav class="topics">
+<a href="../fundamentals/" class="here">Boot Fundamentals and Auto-configuration</a>
+<a href="../config/">Configuration and Profiles</a>
+<a href="../data/">Data, Caching and Migrations</a>
+<a href="../actuator/">Actuator and Observability</a>
+<a href="../testing/">Testing Spring Boot Applications</a>
+<a href="../microservices/">Microservices with Spring Boot</a>
+<a href="../deployment/">Deployment and Performance</a>
+  </nav>
+  <label class="practice"><input type="checkbox" id="practice"> Practice mode<span>Hide answers. Click a question to reveal its answer.</span></label>
+</aside>
+<main class="content">
+<header class="hero" id="top-of-page"><p class="eyebrow">Spring Boot interview playbook</p><h1 class="doc-title">Boot Fundamentals and Auto-configuration</h1><p class="subtitle">What Spring Boot adds, starters, how auto-configuration and startup work, embedded servers, custom starters and Boot 3 migration.</p><p class="intro">10 questions: Beginner 3 &middot; Intermediate 4 &middot; Experienced 3. Each question is tagged <span class="tag t-theory">Theory</span> <span class="tag t-coding">Coding</span> <span class="tag t-scenario">Scenario</span> <span class="tag t-design">Design</span>. Use Practice mode to hide the answers and test yourself.</p></header>
+<h2 id="beginner">Beginner</h2>
+<p class="q" id="F1"><strong><span class="qid">F1</span> What is Spring Boot and how is it different from the Spring Framework? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>Spring Framework gives you the building blocks (IoC, MVC, data access, transactions) but expects you to configure them. <strong>Spring Boot</strong> is an opinionated layer on top that removes the boilerplate:</p>
+<ul><li><strong>Auto-configuration:</strong> sensible beans created for you based on what is on the classpath.</li><li><strong>Starters:</strong> curated dependency bundles (<code>spring-boot-starter-web</code>) with compatible versions managed for you.</li><li><strong>Embedded server:</strong> a runnable <code>jar</code> containing Tomcat/Jetty/Undertow, no WAR deployment needed.</li><li><strong>Production features:</strong> Actuator (health, metrics), externalized configuration, graceful shutdown.</li><li><strong>No XML</strong>, and <code>application.properties</code>/<code>yml</code> for settings.</li></ul>
+<p>Boot does not replace Spring; it configures it. You can override any default by defining your own bean or property.</p>
+</blockquote>
+<p class="q" id="F2"><strong><span class="qid">F2</span> What does @SpringBootApplication do? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>It is a composed annotation of three:</p>
+<ul><li><code>@SpringBootConfiguration</code>: marks the class as a configuration class (a specialized <code>@Configuration</code>).</li><li><code>@EnableAutoConfiguration</code>: turns on auto-configuration.</li><li><code>@ComponentScan</code>: scans the <strong>package of this class and its sub-packages</strong> for <code>@Component</code>, <code>@Service</code>, <code>@Repository</code>, <code>@Controller</code>.</li></ul>
+<pre><code class="language-java">@SpringBootApplication
+public class ShopApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(ShopApplication.class, args);
+    }
+}</code></pre>
+<p>Because scanning starts at this class's package, place the main class in the <strong>root package</strong> (<code>com.shop</code>), with everything else below it. Beans in a sibling package such as <code>com.other</code> will not be found unless you add <code>scanBasePackages</code>.</p>
+</blockquote>
+<p class="q" id="F3"><strong><span class="qid">F3</span> What are Spring Boot starters? Name a few. <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>A starter is a <strong>dependency descriptor</strong> (no code) that pulls in a set of libraries for one purpose, with versions managed by Boot's BOM (<code>spring-boot-dependencies</code>). You add one line instead of hunting compatible versions.</p>
+<ul><li><code>spring-boot-starter-web</code>: Spring MVC, Jackson, embedded Tomcat.</li><li><code>spring-boot-starter-webflux</code>: reactive web with Netty.</li><li><code>spring-boot-starter-data-jpa</code>: Spring Data JPA, Hibernate, HikariCP.</li><li><code>spring-boot-starter-security</code>, <code>-validation</code>, <code>-actuator</code>, <code>-test</code>, <code>-cache</code>, <code>-aop</code>, <code>-amqp</code>, <code>-data-redis</code>.</li></ul>
+<p>Naming convention: official starters are <code>spring-boot-starter-*</code>; third-party ones use <code>*-spring-boot-starter</code>. A custom starter typically bundles an auto-configuration module and the library.</p>
+</blockquote>
+<h2 id="intermediate">Intermediate</h2>
+<p class="q" id="F4"><strong><span class="qid">F4</span> How does auto-configuration work internally? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>Auto-configuration classes are normal <code>@Configuration</code> classes guarded by <strong>conditions</strong>. Boot lists the candidate classes in a file inside each library jar and, at startup, imports only the ones whose conditions pass.</p>
+<pre class="mermaid">flowchart TD
+  A["@EnableAutoConfiguration"] --&gt; B["AutoConfigurationImportSelector"]
+  B --&gt; C["Read META-INF/spring/&lt;br/&gt;org.springframework.boot.autoconfigure.AutoConfiguration.imports&lt;br/&gt;from every jar"]
+  C --&gt; D["Candidate auto-configuration classes"]
+  D --&gt; E{"Conditions pass?&lt;br/&gt;@ConditionalOnClass, OnMissingBean, OnProperty"}
+  E -- "yes" --&gt; F["Register the beans"]
+  E -- "no" --&gt; G["Skip the class"]</pre>
+<p>Key conditions:</p>
+<ul><li><code>@ConditionalOnClass</code>: a library is on the classpath (for example <code>DataSource</code>).</li><li><code>@ConditionalOnMissingBean</code>: <strong>back off if the user already defined this bean</strong>, which is how you override defaults.</li><li><code>@ConditionalOnProperty</code>: a property enables or disables a feature.</li><li><code>@ConditionalOnWebApplication</code>, <code>@ConditionalOnBean</code>, <code>@ConditionalOnResource</code>.</li></ul>
+<p>Since Boot 2.7/3.0 the candidates are registered in <code>META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</code> (the old <code>spring.factories</code> entry is no longer used for this). To see what matched and why, run with <code>--debug</code> or <code>debug=true</code> and read the <strong>conditions evaluation report</strong>, or use the Actuator <code>conditions</code> endpoint.</p>
+</blockquote>
+<p class="q" id="F5"><strong><span class="qid">F5</span> Walk through what happens when SpringApplication.run() executes. <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<pre class="mermaid">flowchart TD
+  A["SpringApplication.run()"] --&gt; B["Create SpringApplicationRunListeners&lt;br/&gt;and Bootstrap context"]
+  B --&gt; C["Prepare Environment&lt;br/&gt;(properties, profiles, env vars)"]
+  C --&gt; D["Print banner,&lt;br/&gt;create ApplicationContext"]
+  D --&gt; E["Load bean definitions&lt;br/&gt;component scan + auto-configuration"]
+  E --&gt; F["Refresh context:&lt;br/&gt;instantiate singletons, run BeanPostProcessors"]
+  F --&gt; G["Start embedded web server"]
+  G --&gt; H["Run ApplicationRunner and CommandLineRunner"]
+  H --&gt; I["Publish ApplicationReadyEvent&lt;br/&gt;app is ready"]</pre>
+<p>Useful hooks: <code>CommandLineRunner</code> / <code>ApplicationRunner</code> (run code after startup), <code>ApplicationReadyEvent</code> listeners, <code>EnvironmentPostProcessor</code> (modify properties before beans exist) and <code>SpringApplicationBuilder</code> for customizing the app. The web server starts <strong>during context refresh</strong>, and the app is marked ready only after the runners finish.</p>
+</blockquote>
+<p class="q" id="F6"><strong><span class="qid">F6</span> How do you switch the embedded server from Tomcat to Jetty or Undertow, and tune it? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Exclude Tomcat from the web starter and add the other server's starter.</p>
+<pre><code class="language-xml">&lt;dependency&gt;
+  &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+  &lt;artifactId&gt;spring-boot-starter-web&lt;/artifactId&gt;
+  &lt;exclusions&gt;
+    &lt;exclusion&gt;
+      &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+      &lt;artifactId&gt;spring-boot-starter-tomcat&lt;/artifactId&gt;
+    &lt;/exclusion&gt;
+  &lt;/exclusions&gt;
+&lt;/dependency&gt;
+&lt;dependency&gt;
+  &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+  &lt;artifactId&gt;spring-boot-starter-jetty&lt;/artifactId&gt;
+&lt;/dependency&gt;</code></pre>
+<p>Common Tomcat tuning properties:</p>
+<pre><code class="language-properties">server.port=8080
+server.tomcat.threads.max=200             # worker threads (thread-per-request)
+server.tomcat.accept-count=100            # queue when all threads are busy
+server.tomcat.max-connections=8192
+server.shutdown=graceful                  # finish in-flight requests on SIGTERM
+server.compression.enabled=true</code></pre>
+<p>Pick the server for features and operational fit; the performance difference rarely matters compared to your own code and downstream calls.</p>
+</blockquote>
+<p class="q" id="F7"><strong><span class="qid">F7</span> How do you exclude or override an auto-configuration? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Three ways, from least to most invasive:</p>
+<ol><li><strong>Define your own bean</strong>: most auto-configs use <code>@ConditionalOnMissingBean</code>, so yours wins automatically.</li><li><strong>Exclude by class or property</strong> when you do not want it at all:</li></ol>
+<pre><code class="language-java">@SpringBootApplication(exclude = { DataSourceAutoConfiguration.class })
+public class App { }</code></pre>
+<pre><code class="language-properties">spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration</code></pre>
+<ol><li>Turn individual features off with their own properties (<code>spring.jpa.open-in-view=false</code>, <code>management.endpoints.enabled-by-default=false</code>).</li></ol>
+<p>A typical case: an app with a JDBC driver on the classpath but no database fails to start because <code>DataSourceAutoConfiguration</code> cannot find a URL. Excluding it (or providing the URL) fixes that.</p>
+</blockquote>
+<h2 id="experienced">Experienced</h2>
+<p class="q" id="F8"><strong><span class="qid">F8</span> How do you create a custom Spring Boot starter for your organization? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Split into an <strong>auto-configuration module</strong> (the logic) and a <strong>starter module</strong> (an empty pom that depends on it), so consumers add one dependency.</p>
+<pre><code class="language-java">@ConfigurationProperties(prefix = "acme.audit")
+public record AuditProperties(boolean enabled, String topic) {}
+
+@AutoConfiguration
+@EnableConfigurationProperties(AuditProperties.class)
+@ConditionalOnProperty(prefix = "acme.audit", name = "enabled", havingValue = "true", matchIfMissing = true)
+public class AuditAutoConfiguration {
+
+    @Bean
+    @ConditionalOnMissingBean                 // let services override with their own implementation
+    AuditPublisher auditPublisher(AuditProperties props, KafkaTemplate&lt;String, String&gt; kafka) {
+        return new KafkaAuditPublisher(kafka, props.topic());
+    }
+}</code></pre>
+<p>Register it in <code>src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</code>:</p>
+<pre><code class="language-text">com.acme.audit.AuditAutoConfiguration</code></pre>
+<p>Guidelines: make everything conditional and overridable, expose settings through <code>@ConfigurationProperties</code> (add <code>spring-boot-configuration-processor</code> for IDE metadata), do not use component scanning inside a starter, and keep dependencies <code>optional</code> where users may not need them. Test with <code>ApplicationContextRunner</code>.</p>
+</blockquote>
+<p class="q" id="F9"><strong><span class="qid">F9</span> What changed in Spring Boot 3 / Spring Framework 6, and what do you need to migrate? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<ul><li><strong>Java 17 baseline</strong> (Java 21 recommended for virtual threads).</li><li><strong>Jakarta EE namespace:</strong> <code>javax.*</code> became <code>jakarta.*</code> (<code>jakarta.persistence</code>, <code>jakarta.servlet</code>, <code>jakarta.validation</code>). Update imports and third-party libraries; tools like OpenRewrite automate this.</li><li><strong>Spring Security 6:</strong> <code>WebSecurityConfigurerAdapter</code> removed (use <code>SecurityFilterChain</code>), <code>authorizeRequests</code> replaced by <code>authorizeHttpRequests</code>, <code>antMatchers</code> replaced by <code>requestMatchers</code>.</li><li><strong>Observability</strong> moved to Micrometer Observation and Micrometer Tracing (Sleuth is gone).</li><li><strong>GraalVM native images</strong> and AOT processing are officially supported.</li><li><code>ProblemDetail</code> (RFC 7807), HTTP interface clients, new auto-configuration registration file, and Hibernate 6.</li></ul>
+<p>Migration plan: upgrade to the latest 2.7.x first and fix deprecation warnings, move to Java 17, run the <strong>Spring Boot Migrator / OpenRewrite</strong> recipes, upgrade to 3.x, fix compile errors package by package, then run the full test suite and a performance check.</p>
+</blockquote>
+<p class="q" id="F10"><strong><span class="qid">F10</span> Startup is slow and memory use is high in containers. What can you do? <span class="tag t-scenario">Scenario</span></strong></p>
+<blockquote>
+<p>Measure first (<code>--debug</code>, startup actuator endpoint, <code>-Xlog:class+load</code>), then pick levers by size of win.</p>
+<pre class="mermaid">flowchart LR
+  P["Slow startup, high memory"] --&gt; M["Measure: Actuator startup endpoint,&lt;br/&gt;conditions report, bean creation time"]
+  M --&gt; L1["Trim: remove unused starters,&lt;br/&gt;exclude unneeded auto-config"]
+  M --&gt; L2["Lazy init: spring.main.lazy-initialization=true"]
+  M --&gt; L3["JVM: AppCDS or CRaC checkpoint,&lt;br/&gt;tune heap for containers"]
+  M --&gt; L4["Native image: GraalVM + AOT,&lt;br/&gt;millisecond starts, lower RSS"]</pre>
+<ul><li>Remove unused dependencies and auto-configurations; reduce component-scan breadth.</li><li><code>spring.main.lazy-initialization=true</code> creates beans on first use (faster start, but first requests are slower and configuration errors appear later).</li><li><strong>Class Data Sharing / AppCDS</strong> and <strong>CRaC</strong> (checkpoint/restore) cut JVM start time without code changes.</li><li><strong>GraalVM native image</strong> (<code>./mvnw -Pnative native:compile</code>) gives start in tens of milliseconds and smaller memory, at the cost of longer builds, reflection hints and some library limits.</li><li>Container sizing: set <code>-XX:MaxRAMPercentage</code>, and do not let the JVM guess from the host's memory.</li></ul>
+<p>State the trade-off: for long-lived services JIT peak throughput is often better than native; native shines for serverless and scale-to-zero.</p>
+</blockquote>
+<footer class="foot">Answers target Spring Framework 6 and Spring Boot 3 (Java 17+). Verify version-specific details against the official reference documentation before an interview.</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="../../assets/script.js"></script>
+<script src="../../assets/qa.js"></script>
+</body>
+</html>

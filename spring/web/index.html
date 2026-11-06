@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Web MVC Interview Questions | My Interview Playbook</title>
+<meta name="description" content="DispatcherServlet request flow, controllers, binding and validation, exception handling, filters vs interceptors and async processing.">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/qa.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+<button class="menu-btn" id="menuBtn" aria-label="Toggle contents" aria-expanded="false">Contents</button>
+<aside class="sidebar" id="sidebar">
+  <a class="back" href="../">&larr; Spring track</a>
+  <p class="side-title">On this page</p>
+  <nav>
+<a href="#top-of-page">Overview</a>
+<a href="#beginner">Beginner <span class="cnt">3</span></a>
+<a href="#intermediate">Intermediate <span class="cnt">4</span></a>
+<a href="#experienced">Experienced <span class="cnt">3</span></a>
+  </nav>
+  <p class="side-title" style="margin-top:20px">Spring topics</p>
+  <nav class="topics">
+<a href="../core/">Spring Core</a>
+<a href="../aop/">Spring AOP</a>
+<a href="../web/" class="here">Spring Web MVC</a>
+<a href="../webflux/">Spring WebFlux</a>
+<a href="../orm/">Spring ORM and Data JPA</a>
+<a href="../rest/">Spring REST API Design</a>
+<a href="../security/">Spring Security</a>
+  </nav>
+  <label class="practice"><input type="checkbox" id="practice"> Practice mode<span>Hide answers. Click a question to reveal its answer.</span></label>
+</aside>
+<main class="content">
+<header class="hero" id="top-of-page"><p class="eyebrow">Spring interview playbook</p><h1 class="doc-title">Spring Web MVC</h1><p class="subtitle">DispatcherServlet request flow, controllers, binding and validation, exception handling, filters vs interceptors and async processing.</p><p class="intro">10 questions: Beginner 3 &middot; Intermediate 4 &middot; Experienced 3. Each question is tagged <span class="tag t-theory">Theory</span> <span class="tag t-coding">Coding</span> <span class="tag t-scenario">Scenario</span> <span class="tag t-design">Design</span>. Use Practice mode to hide the answers and test yourself.</p></header>
+<h2 id="beginner">Beginner</h2>
+<p class="q" id="W1"><strong><span class="qid">W1</span> Explain the Spring MVC request flow. What does DispatcherServlet do? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p><code>DispatcherServlet</code> is the <strong>front controller</strong>: every request enters through it, and it coordinates the other components.</p>
+<pre class="mermaid">sequenceDiagram
+  participant B as Browser or Client
+  participant D as DispatcherServlet
+  participant HM as HandlerMapping
+  participant HA as HandlerAdapter
+  participant C as Controller
+  participant VR as ViewResolver or MessageConverter
+  B-&gt;&gt;D: HTTP request
+  D-&gt;&gt;HM: which handler for this URL and method?
+  HM--&gt;&gt;D: HandlerExecutionChain (controller method + interceptors)
+  D-&gt;&gt;HA: invoke handler
+  HA-&gt;&gt;C: call method (args resolved and validated)
+  C--&gt;&gt;HA: model and view name, or a return object
+  HA--&gt;&gt;D: result
+  D-&gt;&gt;VR: render view, or write body as JSON
+  VR--&gt;&gt;B: HTTP response</pre>
+<p>Steps: map the request to a handler; run interceptor <code>preHandle</code>; resolve arguments (<code>@PathVariable</code>, <code>@RequestBody</code>...); invoke the method; for <code>@RestController</code> an <code>HttpMessageConverter</code> (Jackson) writes the return value as JSON, otherwise a <code>ViewResolver</code> picks a template; run <code>postHandle</code> / <code>afterCompletion</code>.</p>
+</blockquote>
+<p class="q" id="W2"><strong><span class="qid">W2</span> What is the difference between @Controller and @RestController? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p><code>@RestController</code> is <code>@Controller</code> plus <code>@ResponseBody</code> on every method. With <code>@Controller</code>, a returned <code>String</code> is treated as a <strong>view name</strong> (for Thymeleaf/JSP); with <code>@RestController</code> the return value is serialized into the response body (JSON by default).</p>
+<pre><code class="language-java">@RestController
+@RequestMapping("/api/books")
+class BookController {
+    @GetMapping("/{id}")
+    Book get(@PathVariable Long id) { return service.find(id); }   // serialized to JSON
+}</code></pre>
+</blockquote>
+<p class="q" id="W3"><strong><span class="qid">W3</span> Explain @RequestParam, @PathVariable, @RequestBody, @RequestHeader and @ModelAttribute. <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<ul><li><code>@PathVariable</code>: a value from the URL path, <code>/users/{id}</code>.</li><li><code>@RequestParam</code>: a query string or form parameter, <code>/users?role=admin</code>. Supports <code>required</code> and <code>defaultValue</code>.</li><li><code>@RequestBody</code>: the whole request body, deserialized by an <code>HttpMessageConverter</code> (JSON to object).</li><li><code>@RequestHeader</code>: an HTTP header value.</li><li><code>@ModelAttribute</code>: binds form fields or query parameters onto an object (also the default for simple object parameters).</li></ul>
+<pre><code class="language-java">@PostMapping("/users/{orgId}/invite")
+ResponseEntity&lt;Void&gt; invite(@PathVariable Long orgId,
+                            @RequestParam(defaultValue = "member") String role,
+                            @RequestHeader("X-Request-Id") String requestId,
+                            @RequestBody @Valid InviteRequest body) { ... }</code></pre>
+</blockquote>
+<h2 id="intermediate">Intermediate</h2>
+<p class="q" id="W4"><strong><span class="qid">W4</span> How do you validate input and handle exceptions globally? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Add <code>spring-boot-starter-validation</code>, annotate the DTO with Bean Validation constraints, and trigger validation with <code>@Valid</code> (body) or <code>@Validated</code> (path/query parameters on the class). Handle failures in one place with <code>@RestControllerAdvice</code>.</p>
+<pre><code class="language-java">public record CreateUserRequest(
+    @NotBlank @Size(max = 50) String name,
+    @Email @NotBlank String email,
+    @Min(18) int age) {}
+
+@RestController
+class UserController {
+    @PostMapping("/users")
+    ResponseEntity&lt;UserDto&gt; create(@Valid @RequestBody CreateUserRequest req) { ... }
+}
+
+@RestControllerAdvice
+class GlobalExceptionHandler {
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    ProblemDetail onInvalid(MethodArgumentNotValidException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
+        pd.setProperty("errors", ex.getBindingResult().getFieldErrors().stream()
+            .collect(Collectors.toMap(FieldError::getField, FieldError::getDefaultMessage, (a, b) -&gt; a)));
+        return pd;
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    ProblemDetail onNotFound(UserNotFoundException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+}</code></pre>
+<p><code>ProblemDetail</code> (Spring 6) implements RFC 7807 <code>application/problem+json</code>. Do not leak stack traces or internal messages to clients; log them server-side with a correlation id.</p>
+</blockquote>
+<p class="q" id="W5"><strong><span class="qid">W5</span> What is the difference between a Servlet Filter, a HandlerInterceptor and AOP? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<div class="table-wrap"><table><thead><tr><th></th><th>Filter</th><th>HandlerInterceptor</th><th>AOP aspect</th></tr></thead><tbody><tr><td>Belongs to</td><td>Servlet container</td><td>Spring MVC</td><td>Spring AOP (any bean)</td></tr><tr><td>Runs</td><td>Before the <code>DispatcherServlet</code></td><td>Around the controller method</td><td>Around any bean method</td></tr><tr><td>Can see</td><td>Raw request/response</td><td>Request, response and the handler</td><td>Method arguments and result</td></tr><tr><td>Typical use</td><td>Security, CORS, request logging, compression</td><td>Auth checks, locale, timing, per-request context</td><td>Transactions, caching, auditing</td></tr></tbody></table></div>
+<p>Order on the way in: filters, then <code>DispatcherServlet</code>, then interceptors <code>preHandle</code>, then the controller (and any aspects on it). Spring Security itself is a chain of filters, which is why it works before MVC.</p>
+</blockquote>
+<p class="q" id="W6"><strong><span class="qid">W6</span> How does content negotiation work in Spring MVC? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>Spring picks the response format by matching what the client accepts with what the controller can produce:</p>
+<ul><li>The <code>Accept</code> header (<code>application/json</code>, <code>application/xml</code>) is the standard way. Path-extension and <code>?format=</code> strategies are disabled by default.</li><li><code>produces</code> / <code>consumes</code> on <code>@RequestMapping</code> narrow what a method handles; a mismatch gives <code>406 Not Acceptable</code> or <code>415 Unsupported Media Type</code>.</li><li>An <code>HttpMessageConverter</code> that supports the type and media type does the writing (Jackson for JSON, Jackson XML if on the classpath).</li></ul>
+<pre><code class="language-java">@GetMapping(value = "/report", produces = {MediaType.APPLICATION_JSON_VALUE, "text/csv"})
+Report report() { ... }</code></pre>
+</blockquote>
+<p class="q" id="W7"><strong><span class="qid">W7</span> How do you configure CORS and when does a browser send a preflight request? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>CORS is enforced by the <strong>browser</strong>: a cross-origin call with non-simple methods or headers (e.g. <code>PUT</code>, <code>Authorization</code>, JSON content type) triggers an <code>OPTIONS</code> preflight, and the server must answer with <code>Access-Control-Allow-*</code> headers.</p>
+<pre><code class="language-java">@Configuration
+class WebConfig implements WebMvcConfigurer {
+    @Override
+    public void addCorsMappings(CorsRegistry r) {
+        r.addMapping("/api/**")
+         .allowedOrigins("https://app.example.com")
+         .allowedMethods("GET", "POST", "PUT", "DELETE")
+         .allowedHeaders("Authorization", "Content-Type")
+         .allowCredentials(true)
+         .maxAge(3600);
+    }
+}</code></pre>
+<p>With Spring Security you must enable CORS in the security chain too (<code>http.cors(Customizer.withDefaults())</code>), otherwise the filter rejects the preflight before MVC sees it. Never combine <code>allowCredentials(true)</code> with a wildcard origin.</p>
+</blockquote>
+<h2 id="experienced">Experienced</h2>
+<p class="q" id="W8"><strong><span class="qid">W8</span> How does Spring MVC handle concurrency, and how do you handle long-running requests? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>Classic Spring MVC uses a <strong>thread-per-request</strong> model: the servlet container (Tomcat, default 200 worker threads) assigns one thread to a request until the response is written. Blocking I/O keeps that thread busy, so slow downstream calls exhaust the pool and requests queue up.</p>
+<p>Options:</p>
+<ul><li><strong>Async processing:</strong> return <code>Callable&lt;T&gt;</code>, <code>DeferredResult&lt;T&gt;</code> or <code>CompletableFuture&lt;T&gt;</code>. The container thread is released while the work runs elsewhere (<code>DeferredResult</code> is completed by another event).</li><li><strong>Virtual threads (Java 21 + Boot 3.2+):</strong> set <code>spring.threads.virtual.enabled=true</code>. Tomcat then runs each request on a virtual thread, so blocking calls no longer tie up scarce platform threads. This keeps simple imperative code with much higher concurrency.</li><li><strong>Offload long jobs:</strong> accept the request, return <code>202 Accepted</code> with a status URL, and process through a queue.</li></ul>
+<pre><code class="language-java">@GetMapping("/report")
+Callable&lt;Report&gt; report() {
+    return () -&gt; reportService.generate();   // runs on the MVC async executor, container thread is freed
+}</code></pre>
+</blockquote>
+<p class="q" id="W9"><strong><span class="qid">W9</span> Users report that your API randomly times out under load. How do you investigate? <span class="tag t-scenario">Scenario</span></strong></p>
+<blockquote>
+<p>Approach: confirm, locate the bottleneck, then fix.</p>
+<pre class="mermaid">flowchart TD
+  A["Symptom: p99 latency and timeouts"] --&gt; B["Check metrics:&lt;br/&gt;request rate, p95/p99, error rate"]
+  B --&gt; C{"Which resource is saturated?"}
+  C --&gt;|"Tomcat threads busy"| D["Thread dump: where are threads blocked?"]
+  C --&gt;|"DB pool exhausted"| E["Hikari pending count, slow queries"]
+  C --&gt;|"CPU or GC high"| F["Profile, heap and GC logs"]
+  D --&gt; G["Slow downstream call: add timeouts, circuit breaker, bulkhead"]
+  E --&gt; H["Fix N+1 or missing index, resize pool, shorten transactions"]
+  F --&gt; I["Reduce allocations, tune heap"]</pre>
+<p>Concrete checks: Actuator and Micrometer metrics (<code>tomcat.threads.busy</code>, <code>hikaricp.connections.pending</code>, <code>http.server.requests</code>); thread dumps (many threads <code>WAITING</code> on a socket read or on <code>HikariPool.getConnection</code>); slow query logs; tracing to find which hop is slow. Typical fixes: set connect and read <strong>timeouts</strong> on every outbound client, cap pool sizes deliberately, add a circuit breaker, cache hot reads, and consider virtual threads. Load-test after the fix.</p>
+</blockquote>
+<p class="q" id="W10"><strong><span class="qid">W10</span> How would you design file upload and download for large files without running out of memory? <span class="tag t-design">Design</span></strong></p>
+<blockquote>
+<p>Never load the whole file into a <code>byte[]</code>. Stream it.</p>
+<ul><li><strong>Upload:</strong> use <code>MultipartFile</code> with limits (<code>spring.servlet.multipart.max-file-size</code>) for small files; for large files prefer a <strong>pre-signed URL</strong> so the client uploads straight to object storage (S3), and your service only receives metadata. This removes the file from your servers entirely.</li><li><strong>Download:</strong> return a <code>StreamingResponseBody</code> or <code>ResponseEntity&lt;Resource&gt;</code> that streams in chunks, set <code>Content-Disposition</code>, and support <code>Range</code> requests for resume.</li><li>Scan uploads for malware, validate content type by content (not by extension), and generate your own storage key rather than trusting the client's file name.</li></ul>
+<pre><code class="language-java">@GetMapping("/files/{id}")
+ResponseEntity&lt;StreamingResponseBody&gt; download(@PathVariable String id) {
+    StreamingResponseBody body = out -&gt; storage.copyTo(id, out);   // streams, constant memory
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"report.pdf\"")
+        .contentType(MediaType.APPLICATION_PDF)
+        .body(body);
+}</code></pre>
+<pre class="mermaid">flowchart LR
+  C["Client"] -- "1. request upload URL" --&gt; API["Spring Boot API"]
+  API -- "2. pre-signed URL" --&gt; C
+  C -- "3. PUT file directly" --&gt; S3[("Object storage")]
+  S3 -- "4. event: object created" --&gt; W["Worker: virus scan, metadata"]
+  W --&gt; DB[("Database")]</pre>
+</blockquote>
+<footer class="foot">Answers target Spring Framework 6 and Spring Boot 3 (Java 17+). Verify version-specific details against the official reference documentation before an interview.</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="../../assets/script.js"></script>
+<script src="../../assets/qa.js"></script>
+</body>
+</html>

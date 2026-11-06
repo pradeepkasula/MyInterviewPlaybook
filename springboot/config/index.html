@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Configuration and Profiles Interview Questions | My Interview Playbook</title>
+<meta name="description" content="Properties and YAML, profiles, @Value vs @ConfigurationProperties, precedence, containers and secrets, and conditional beans.">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/qa.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+<button class="menu-btn" id="menuBtn" aria-label="Toggle contents" aria-expanded="false">Contents</button>
+<aside class="sidebar" id="sidebar">
+  <a class="back" href="../">&larr; Spring Boot track</a>
+  <p class="side-title">On this page</p>
+  <nav>
+<a href="#top-of-page">Overview</a>
+<a href="#beginner">Beginner <span class="cnt">3</span></a>
+<a href="#intermediate">Intermediate <span class="cnt">4</span></a>
+<a href="#experienced">Experienced <span class="cnt">2</span></a>
+  </nav>
+  <p class="side-title" style="margin-top:20px">Spring Boot topics</p>
+  <nav class="topics">
+<a href="../fundamentals/">Boot Fundamentals and Auto-configuration</a>
+<a href="../config/" class="here">Configuration and Profiles</a>
+<a href="../data/">Data, Caching and Migrations</a>
+<a href="../actuator/">Actuator and Observability</a>
+<a href="../testing/">Testing Spring Boot Applications</a>
+<a href="../microservices/">Microservices with Spring Boot</a>
+<a href="../deployment/">Deployment and Performance</a>
+  </nav>
+  <label class="practice"><input type="checkbox" id="practice"> Practice mode<span>Hide answers. Click a question to reveal its answer.</span></label>
+</aside>
+<main class="content">
+<header class="hero" id="top-of-page"><p class="eyebrow">Spring Boot interview playbook</p><h1 class="doc-title">Configuration and Profiles</h1><p class="subtitle">Properties and YAML, profiles, @Value vs @ConfigurationProperties, precedence, containers and secrets, and conditional beans.</p><p class="intro">9 questions: Beginner 3 &middot; Intermediate 4 &middot; Experienced 2. Each question is tagged <span class="tag t-theory">Theory</span> <span class="tag t-coding">Coding</span> <span class="tag t-scenario">Scenario</span> <span class="tag t-design">Design</span>. Use Practice mode to hide the answers and test yourself.</p></header>
+<h2 id="beginner">Beginner</h2>
+<p class="q" id="G1"><strong><span class="qid">G1</span> What is the difference between application.properties and application.yml? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>Both configure the app and are read by the same mechanism; they differ only in format. YAML is hierarchical and avoids repeating prefixes; <code>.properties</code> is flat and simple. Use one consistently (if both exist, <code>.properties</code> takes precedence over <code>.yml</code> in the same location).</p>
+<pre><code class="language-properties"># application.properties
+server.port=8081
+spring.datasource.url=jdbc:postgresql://localhost:5432/shop
+spring.datasource.username=shop</code></pre>
+<pre><code class="language-yaml"># application.yml (same settings)
+server:
+  port: 8081
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/shop
+    username: shop</code></pre>
+<p>YAML pitfalls: indentation errors, and quoting values that YAML would reinterpret (<code>on</code>, <code>no</code>, <code>1.10</code>, strings starting with <code>*</code>). YAML also allows several documents in one file separated by <code>---</code> with <code>spring.config.activate.on-profile</code>.</p>
+</blockquote>
+<p class="q" id="G2"><strong><span class="qid">G2</span> What are Spring profiles and how do you use them? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Profiles let you vary beans and configuration per environment (<code>dev</code>, <code>test</code>, <code>prod</code>).</p>
+<pre><code class="language-properties"># activate: application.properties, env var, or command line
+spring.profiles.active=dev
+# SPRING_PROFILES_ACTIVE=prod   |   java -jar app.jar --spring.profiles.active=prod</code></pre>
+<ul><li><strong>Profile-specific files:</strong> <code>application-dev.yml</code>, <code>application-prod.yml</code> are loaded in addition to <code>application.yml</code> and override it.</li><li><strong>Profile-specific beans:</strong></li></ul>
+<pre><code class="language-java">@Configuration
+class StorageConfig {
+    @Bean @Profile("dev")
+    FileStorage localStorage() { return new LocalDiskStorage(); }
+
+    @Bean @Profile("!dev")                       // every profile except dev
+    FileStorage s3Storage(S3Client s3) { return new S3Storage(s3); }
+}</code></pre>
+<ul><li><strong>Profile groups</strong> (<code>spring.profiles.group.prod=prod-db,prod-security</code>) activate a set together.</li></ul>
+<p>Do not put production secrets in profile files committed to source control; see the externalized configuration questions.</p>
+</blockquote>
+<p class="q" id="G3"><strong><span class="qid">G3</span> What is the difference between @Value and @ConfigurationProperties? Show both. <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p><code>@Value</code> injects a single property (supports SpEL and defaults). <code>@ConfigurationProperties</code> binds a <strong>group of related properties</strong> to a typed object, with relaxed binding, validation and IDE metadata.</p>
+<pre><code class="language-java">// @Value: fine for one or two values
+@Service
+class Mailer {
+    Mailer(@Value("${mail.from:noreply@shop.com}") String from) { ... }
+}
+
+// @ConfigurationProperties: preferred for structured settings
+@ConfigurationProperties(prefix = "shop.payment")
+@Validated
+public record PaymentProperties(
+    @NotBlank String apiUrl,
+    @DefaultValue("3") @Min(1) int maxRetries,
+    @DefaultValue("2s") Duration timeout,
+    List&lt;String&gt; allowedCurrencies) {}
+
+@SpringBootApplication
+@ConfigurationPropertiesScan          // or @EnableConfigurationProperties(PaymentProperties.class)
+class App {}</code></pre>
+<pre><code class="language-yaml">shop:
+  payment:
+    api-url: https://pay.example.com
+    max-retries: 5
+    timeout: 3s
+    allowed-currencies: [USD, EUR]</code></pre>
+<p>Advantages of <code>@ConfigurationProperties</code>: type conversion (<code>Duration</code>, <code>DataSize</code>), constructor binding with records (immutable), fail-fast validation at startup, relaxed binding (<code>api-url</code>, <code>apiUrl</code>, <code>API_URL</code> all work) and generated metadata with <code>spring-boot-configuration-processor</code>.</p>
+</blockquote>
+<h2 id="intermediate">Intermediate</h2>
+<p class="q" id="G4"><strong><span class="qid">G4</span> What is the order of precedence for property sources? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>Later sources override earlier ones. The important order, from <strong>highest to lowest</strong> priority:</p>
+<ol><li>Command-line arguments (<code>--server.port=9000</code>)</li><li><code>SPRING_APPLICATION_JSON</code> and Java system properties (<code>-Dserver.port=9000</code>)</li><li><strong>OS environment variables</strong> (<code>SERVER_PORT=9000</code>)</li><li>Profile-specific config files outside the jar, then inside the jar (<code>application-prod.yml</code>)</li><li>General config files outside the jar, then inside the jar (<code>application.yml</code>)</li><li><code>@PropertySource</code> on <code>@Configuration</code> classes</li><li>Default properties (<code>SpringApplication.setDefaultProperties</code>)</li></ol>
+<p>Practical consequence: the <strong>same jar</strong> is configured per environment by environment variables or an external config file, without rebuilding. Config file locations are searched in order: <code>classpath:/</code>, <code>classpath:/config/</code>, <code>./</code>, <code>./config/</code>, then <code>./config/*/</code>, with later locations winning. Add more with <code>spring.config.import</code> (for example <code>optional:file:/etc/shop/</code> or <code>configserver:</code>).</p>
+</blockquote>
+<p class="q" id="G5"><strong><span class="qid">G5</span> How do you configure an application in Docker and Kubernetes, and handle secrets? <span class="tag t-scenario">Scenario</span></strong></p>
+<blockquote>
+<p>Follow the <strong>twelve-factor</strong> rule: config lives in the environment, not in the image.</p>
+<pre class="mermaid">flowchart LR
+  IMG["One container image&lt;br/&gt;(no secrets, no env-specific config)"] --&gt; POD["Pod"]
+  CM["ConfigMap&lt;br/&gt;non-secret settings"] -- "env vars or mounted file" --&gt; POD
+  SEC["Secret / Vault / cloud secrets manager"] -- "env vars or mounted file" --&gt; POD
+  POD --&gt; APP["Spring Boot app&lt;br/&gt;relaxed binding reads env"]</pre>
+<ul><li><strong>Environment variables</strong> use relaxed binding: <code>SPRING_DATASOURCE_URL</code>, <code>SHOP_PAYMENT_MAX_RETRIES</code> map to the properties.</li><li><strong>ConfigMap</strong> mounted as a file (<code>/config/application.yml</code>) and loaded with <code>spring.config.import=optional:file:/config/</code> or Kubernetes <code>configtree:</code> for one-file-per-secret mounts (<code>spring.config.import=optional:configtree:/run/secrets/</code>).</li><li><strong>Secrets:</strong> Kubernetes Secrets (base64 is not encryption; enable encryption at rest), or better an external manager (HashiCorp Vault, AWS Secrets Manager, Azure Key Vault) with short-lived credentials.</li><li>Never bake credentials into the image or the repository, never log property values, and restrict <code>/actuator/env</code> (Boot masks known sensitive keys, but do not rely on that alone).</li></ul>
+</blockquote>
+<p class="q" id="G6"><strong><span class="qid">G6</span> How do you validate configuration at startup, and why is it worth it? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Add <code>@Validated</code> on the properties class with Bean Validation constraints (needs <code>spring-boot-starter-validation</code>). If a value is missing or invalid, the application <strong>fails to start with a clear message</strong> instead of failing later in production.</p>
+<pre><code class="language-java">@ConfigurationProperties(prefix = "shop.mail")
+@Validated
+public record MailProperties(
+    @NotBlank String host,
+    @Min(1) @Max(65535) int port,
+    @Email String from) {}</code></pre>
+<pre><code class="language-text">***************************
+APPLICATION FAILED TO START
+***************************
+Binding to target ... failed:
+    Property: shop.mail.port
+    Value: "0"
+    Reason: must be greater than or equal to 1</code></pre>
+<p>Fail fast is operationally valuable: a bad rollout is detected by the readiness check during deployment, not by customers.</p>
+</blockquote>
+<p class="q" id="G7"><strong><span class="qid">G7</span> How do you enable beans or features conditionally (feature toggles)? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Use <code>@Conditional*</code> annotations for <strong>startup-time</strong> switches.</p>
+<pre><code class="language-java">@Configuration
+class FeatureConfig {
+
+    @Bean
+    @ConditionalOnProperty(name = "feature.recommendations", havingValue = "true")
+    RecommendationService recommendations() { return new MlRecommendationService(); }
+
+    @Bean
+    @ConditionalOnMissingBean(RecommendationService.class)     // fallback when the feature is off
+    RecommendationService noop() { return new NoopRecommendationService(); }
+}</code></pre>
+<p>These are evaluated once at startup, so flipping the property needs a restart. For <strong>runtime</strong> toggles (gradual rollout, kill switch) use a feature-flag system (Unleash, LaunchDarkly, Togglz, Spring Cloud Config with <code>@RefreshScope</code>) and check the flag at call time.</p>
+</blockquote>
+<h2 id="experienced">Experienced</h2>
+<p class="q" id="G8"><strong><span class="qid">G8</span> Design centralized configuration for 30 microservices with secrets, auditing and no-restart updates. <span class="tag t-design">Design</span></strong></p>
+<blockquote>
+<pre class="mermaid">flowchart LR
+  GIT[("Git repo&lt;br/&gt;config per app and profile")] --&gt; CS["Spring Cloud Config Server&lt;br/&gt;(or Consul, AWS AppConfig)"]
+  V[("Vault&lt;br/&gt;secrets")] --&gt; CS
+  CS --&gt; S1["Order service"]
+  CS --&gt; S2["Payment service"]
+  CS --&gt; S3["Catalog service"]
+  BUS["Spring Cloud Bus / webhook&lt;br/&gt;(refresh event)"] -. "refresh" .-&gt; S1
+  BUS -. "refresh" .-&gt; S2
+  BUS -. "refresh" .-&gt; S3</pre>
+<ul><li><strong>Source of truth in Git:</strong> reviews, history and rollback. Secrets are not committed: Config Server resolves them from <strong>Vault</strong> (or services read the secrets manager directly).</li><li><strong>Bootstrap:</strong> <code>spring.config.import=optional:configserver:https://config.internal</code>; secure the server with authentication and TLS; encrypt sensitive values (<code>{cipher}...</code>).</li><li><strong>Dynamic refresh:</strong> <code>@RefreshScope</code> beans are rebuilt on <code>POST /actuator/refresh</code> (or a Spring Cloud Bus event for all instances). It only refreshes <code>@ConfigurationProperties</code> and <code>@RefreshScope</code> beans, not everything (a <code>DataSource</code> still needs a restart).</li><li><strong>Resilience:</strong> services must start if the config server is down: keep sane defaults or a cached copy and use <code>optional:</code>.</li><li><strong>Kubernetes alternative:</strong> ConfigMaps/Secrets plus a rolling restart is often simpler than running Config Server; choose the lighter option that satisfies your audit and rollout needs.</li></ul>
+</blockquote>
+<p class="q" id="G9"><strong><span class="qid">G9</span> The same artifact must run in dev, staging and prod. What do you keep in the build vs outside it? <span class="tag t-scenario">Scenario</span></strong></p>
+<blockquote>
+<p><strong>Build once, deploy many.</strong> The artifact must be identical across environments; only configuration changes.</p>
+<ul><li><strong>In the artifact:</strong> code, default (safe, non-secret) properties in <code>application.yml</code>, profile files only for <em>structural</em> differences (which beans exist), and nothing environment-specific such as hostnames or credentials.</li><li><strong>Outside the artifact:</strong> URLs, credentials, feature flags, pool sizes, log levels, supplied through environment variables, mounted files, a config server or a secrets manager.</li><li>Verify with the same pipeline: run the identical image through test, staging and production; promote by tag, never rebuild per environment (a rebuild is a different artifact, so what you tested is not what you ship).</li><li>Guard against drift: keep config in version control, validate it at startup (<code>@Validated</code>), and print the effective non-secret configuration at startup (Actuator <code>configprops</code>/<code>env</code>, secured) to compare environments.</li></ul>
+</blockquote>
+<footer class="foot">Answers target Spring Framework 6 and Spring Boot 3 (Java 17+). Verify version-specific details against the official reference documentation before an interview.</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="../../assets/script.js"></script>
+<script src="../../assets/qa.js"></script>
+</body>
+</html>

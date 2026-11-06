@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data, Caching and Migrations Interview Questions | My Interview Playbook</title>
+<meta name="description" content="DataSource auto-configuration, ddl-auto vs Flyway, Spring Cache with Redis, cache pitfalls, multiple datasources and scheduled jobs.">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/qa.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+<button class="menu-btn" id="menuBtn" aria-label="Toggle contents" aria-expanded="false">Contents</button>
+<aside class="sidebar" id="sidebar">
+  <a class="back" href="../">&larr; Spring Boot track</a>
+  <p class="side-title">On this page</p>
+  <nav>
+<a href="#top-of-page">Overview</a>
+<a href="#beginner">Beginner <span class="cnt">3</span></a>
+<a href="#intermediate">Intermediate <span class="cnt">4</span></a>
+<a href="#experienced">Experienced <span class="cnt">3</span></a>
+  </nav>
+  <p class="side-title" style="margin-top:20px">Spring Boot topics</p>
+  <nav class="topics">
+<a href="../fundamentals/">Boot Fundamentals and Auto-configuration</a>
+<a href="../config/">Configuration and Profiles</a>
+<a href="../data/" class="here">Data, Caching and Migrations</a>
+<a href="../actuator/">Actuator and Observability</a>
+<a href="../testing/">Testing Spring Boot Applications</a>
+<a href="../microservices/">Microservices with Spring Boot</a>
+<a href="../deployment/">Deployment and Performance</a>
+  </nav>
+  <label class="practice"><input type="checkbox" id="practice"> Practice mode<span>Hide answers. Click a question to reveal its answer.</span></label>
+</aside>
+<main class="content">
+<header class="hero" id="top-of-page"><p class="eyebrow">Spring Boot interview playbook</p><h1 class="doc-title">Data, Caching and Migrations</h1><p class="subtitle">DataSource auto-configuration, ddl-auto vs Flyway, Spring Cache with Redis, cache pitfalls, multiple datasources and scheduled jobs.</p><p class="intro">10 questions: Beginner 3 &middot; Intermediate 4 &middot; Experienced 3. Each question is tagged <span class="tag t-theory">Theory</span> <span class="tag t-coding">Coding</span> <span class="tag t-scenario">Scenario</span> <span class="tag t-design">Design</span>. Use Practice mode to hide the answers and test yourself.</p></header>
+<h2 id="beginner">Beginner</h2>
+<p class="q" id="D1"><strong><span class="qid">D1</span> How does Spring Boot auto-configure a DataSource and connection pool? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>When a JDBC driver (and a starter such as <code>spring-boot-starter-data-jpa</code>) is on the classpath and <code>spring.datasource.url</code> is set, Boot creates a <code>DataSource</code> bean. The pool is <strong>HikariCP</strong> by default (Tomcat JDBC, DBCP2 and Oracle UCP are fallbacks). With an embedded database (H2, HSQL, Derby) and no URL, Boot creates an in-memory one automatically, which is handy for tests but a surprising default in production.</p>
+<pre><code class="language-yaml">spring:
+  datasource:
+    url: jdbc:postgresql://db:5432/shop
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 15
+      connection-timeout: 5000</code></pre>
+<p>Boot also configures <code>JdbcTemplate</code>, a <code>DataSourceTransactionManager</code> or <code>JpaTransactionManager</code>, and the JPA <code>EntityManagerFactory</code>. Define your own <code>DataSource</code> bean and the auto-configuration backs off.</p>
+</blockquote>
+<p class="q" id="D2"><strong><span class="qid">D2</span> What does spring.jpa.hibernate.ddl-auto do and what should you use in production? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>It tells Hibernate whether to manage the schema at startup:</p>
+<div class="table-wrap"><table><thead><tr><th>Value</th><th>Effect</th></tr></thead><tbody><tr><td><code>none</code></td><td>Do nothing</td></tr><tr><td><code>validate</code></td><td>Check that entities match the schema, fail if not</td></tr><tr><td><code>update</code></td><td>Add missing tables/columns (never drops); unpredictable</td></tr><tr><td><code>create</code></td><td>Drop and recreate at startup</td></tr><tr><td><code>create-drop</code></td><td>Create at startup, drop on shutdown</td></tr></tbody></table></div>
+<p>Defaults: <code>create-drop</code> for embedded databases, <code>none</code> otherwise. In production use <code>none</code> or <code>validate</code> and manage the schema with <strong>versioned migrations</strong> (Flyway or Liquibase). <code>update</code> cannot rename or drop, cannot be reviewed, and can differ between environments.</p>
+</blockquote>
+<p class="q" id="D3"><strong><span class="qid">D3</span> How do you add caching with @Cacheable? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Enable caching and annotate methods; Boot auto-configures a <code>CacheManager</code> (a simple in-memory map by default, Caffeine or Redis if configured).</p>
+<pre><code class="language-java">@Configuration
+@EnableCaching
+class CacheConfig {}
+
+@Service
+class ProductService {
+
+    @Cacheable(cacheNames = "products", key = "#id")
+    public Product get(Long id) { return repo.findById(id).orElseThrow(); }      // runs only on a cache miss
+
+    @CachePut(cacheNames = "products", key = "#result.id")
+    public Product update(Product p) { return repo.save(p); }                    // always runs, refreshes the cache
+
+    @CacheEvict(cacheNames = "products", key = "#id")
+    public void delete(Long id) { repo.deleteById(id); }                         // removes the entry
+}</code></pre>
+<p>Caching is implemented with AOP proxies, so the self-invocation rule applies (a call from another method of the same class is not cached). Cached objects must be serializable for distributed caches, and cache <strong>immutable DTOs</strong>, not JPA entities.</p>
+</blockquote>
+<h2 id="intermediate">Intermediate</h2>
+<p class="q" id="D4"><strong><span class="qid">D4</span> How do you manage database schema changes with Flyway or Liquibase? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Add <code>flyway-core</code> (plus <code>flyway-database-postgresql</code> for recent Flyway versions). Boot runs pending migrations at startup, before JPA validation.</p>
+<pre><code class="language-text">src/main/resources/db/migration/
+  V1__create_orders.sql
+  V2__add_order_status.sql
+  V3__index_orders_by_customer.sql</code></pre>
+<pre><code class="language-sql">-- V2__add_order_status.sql
+ALTER TABLE orders ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'NEW';
+CREATE INDEX idx_orders_status ON orders(status);</code></pre>
+<p>Rules: migrations are <strong>immutable once applied</strong> (Flyway checks checksums; fix forward with a new version), named <code>V&lt;version&gt;__&lt;description&gt;.sql</code>, and reviewed like code. <code>R__</code> files are repeatable (views, procedures). Liquibase offers the same idea with changelogs in XML/YAML and rollback support. In a multi-instance deployment, the migration lock makes sure only one instance applies changes; for large clusters run migrations as a separate pre-deploy job.</p>
+</blockquote>
+<p class="q" id="D5"><strong><span class="qid">D5</span> How would you configure Redis as a distributed cache with TTLs and JSON serialization? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<pre><code class="language-java">@Configuration
+@EnableCaching
+class RedisCacheConfig {
+
+    @Bean
+    RedisCacheManager cacheManager(RedisConnectionFactory cf) {
+        RedisCacheConfiguration defaults = RedisCacheConfiguration.defaultCacheConfig()
+            .entryTtl(Duration.ofMinutes(10))                           // always set a TTL
+            .disableCachingNullValues()
+            .serializeValuesWith(RedisSerializationContext.SerializationPair
+                .fromSerializer(new GenericJackson2JsonRedisSerializer()));   // JSON, not Java serialization
+
+        return RedisCacheManager.builder(cf)
+            .cacheDefaults(defaults)
+            .withCacheConfiguration("products", defaults.entryTtl(Duration.ofHours(1)))
+            .withCacheConfiguration("prices",   defaults.entryTtl(Duration.ofSeconds(30)))
+            .build();
+    }
+}</code></pre>
+<pre><code class="language-properties">spring.data.redis.host=redis
+spring.data.redis.timeout=500ms</code></pre>
+<p>Choices to explain: per-cache TTLs match how stale each data type may be; JSON avoids class-version problems of Java serialization; a short <strong>Redis timeout</strong> and a fallback to the database prevent a cache outage from taking the app down (handle with a custom <code>CacheErrorHandler</code>). Use <strong>Caffeine</strong> (in-process) for small hot data and Redis when many instances must share a cache; a two-level cache combines both.</p>
+</blockquote>
+<p class="q" id="D6"><strong><span class="qid">D6</span> What are the common caching problems and how do you handle them? <span class="tag t-scenario">Scenario</span></strong></p>
+<blockquote>
+<ul><li><strong>Stale data:</strong> the cache holds old values after the database changed. Fix: TTLs, <code>@CacheEvict</code>/<code>@CachePut</code> on writes, or event-driven invalidation.</li><li><strong>Cache stampede (thundering herd):</strong> a hot key expires and thousands of requests hit the database together. Fix: <code>@Cacheable(sync = true)</code> (one loader per key per instance), jittered TTLs, request coalescing, or refresh-ahead.</li><li><strong>Cache penetration:</strong> requests for keys that do not exist bypass the cache every time. Fix: cache the "not found" result with a short TTL, or use a Bloom filter.</li><li><strong>Hot key:</strong> one key overloads a Redis shard. Fix: local in-process cache in front, replicate the key.</li><li><strong>Inconsistency between cache and database on failure:</strong> write the database first, then evict/update the cache; accept brief staleness or use a transactional outbox/CDC for invalidation.</li></ul>
+<pre><code class="language-java">@Cacheable(cacheNames = "products", key = "#id", sync = true)    // only one thread loads a missing key
+public Product get(Long id) { ... }</code></pre>
+<p>Always monitor hit ratio and eviction counts; a cache with a low hit ratio is just extra latency.</p>
+</blockquote>
+<p class="q" id="D7"><strong><span class="qid">D7</span> How do you configure two databases in one Spring Boot application? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Boot auto-configures one <code>DataSource</code>. For two, define beans explicitly, mark one <code>@Primary</code>, and point each repository package to its own <code>EntityManagerFactory</code> and transaction manager.</p>
+<pre><code class="language-java">@Configuration
+@EnableJpaRepositories(basePackages = "com.shop.orders",
+    entityManagerFactoryRef = "ordersEmf", transactionManagerRef = "ordersTm")
+class OrdersDbConfig {
+
+    @Bean @Primary
+    @ConfigurationProperties("app.datasource.orders")
+    DataSourceProperties ordersProps() { return new DataSourceProperties(); }
+
+    @Bean @Primary
+    DataSource ordersDataSource() { return ordersProps().initializeDataSourceBuilder().build(); }
+
+    @Bean @Primary
+    LocalContainerEntityManagerFactoryBean ordersEmf(EntityManagerFactoryBuilder b,
+                                                      @Qualifier("ordersDataSource") DataSource ds) {
+        return b.dataSource(ds).packages("com.shop.orders").persistenceUnit("orders").build();
+    }
+
+    @Bean @Primary
+    PlatformTransactionManager ordersTm(@Qualifier("ordersEmf") EntityManagerFactory emf) {
+        return new JpaTransactionManager(emf);
+    }
+}
+// repeat for "reports" with its own package, beans and refs (no @Primary)</code></pre>
+<p>Remember <code>@Transactional("ordersTm")</code> to pick the manager, and that a single <code>@Transactional</code> cannot span two databases atomically (use sagas or a distributed transaction manager only when truly needed).</p>
+</blockquote>
+<h2 id="experienced">Experienced</h2>
+<p class="q" id="D8"><strong><span class="qid">D8</span> Your @Scheduled job runs on every instance and sends duplicate emails. How do you fix it? <span class="tag t-scenario">Scenario</span></strong></p>
+<blockquote>
+<p><code>@Scheduled</code> runs on <strong>each</strong> instance, so three replicas run the job three times. Options:</p>
+<ol><li><strong>Distributed lock</strong> with <strong>ShedLock</strong>: a lock row (JDBC, Redis, Mongo) ensures only one instance executes a run.</li><li>A dedicated worker deployment (one replica, or a Kubernetes <code>CronJob</code>) for schedules.</li><li>Make the job <strong>idempotent</strong> regardless (claim rows with <code>update ... where status = 'PENDING'</code> returning the rows you won, or <code>SELECT ... FOR UPDATE SKIP LOCKED</code>), so duplicates are harmless.</li></ol>
+<pre><code class="language-java">@Scheduled(cron = "0 0 * * * *")
+@SchedulerLock(name = "sendDigest", lockAtMostFor = "PT50M", lockAtLeastFor = "PT5M")
+public void sendDigest() { ... }</code></pre>
+<pre class="mermaid">flowchart LR
+  T["Cron tick on 3 instances"] --&gt; I1["Instance 1"]
+  T --&gt; I2["Instance 2"]
+  T --&gt; I3["Instance 3"]
+  I1 -- "acquire lock: success" --&gt; L[("ShedLock table")]
+  I2 -- "lock held: skip" --&gt; L
+  I3 -- "lock held: skip" --&gt; L
+  I1 --&gt; J["Run job once"]</pre>
+<p>Set <code>lockAtMostFor</code> above the job's normal duration so a crashed instance does not hold the lock forever. For heavy or restartable work prefer Spring Batch or a queue with competing consumers over a cron loop.</p>
+</blockquote>
+<p class="q" id="D9"><strong><span class="qid">D9</span> Design the caching layer for a product catalog read by 20,000 requests/second with infrequent updates. <span class="tag t-design">Design</span></strong></p>
+<blockquote>
+<pre class="mermaid">flowchart LR
+  C["Clients"] --&gt; CDN["CDN / HTTP cache&lt;br/&gt;(ETag, Cache-Control)"]
+  CDN --&gt; API["Catalog API instances"]
+  API --&gt; L1["L1: Caffeine&lt;br/&gt;in-process, 30 s TTL"]
+  L1 --&gt; L2[("L2: Redis&lt;br/&gt;10 min TTL, shared")]
+  L2 --&gt; DB[("Primary database /&lt;br/&gt;read replica")]
+  ED["Product update event&lt;br/&gt;(Kafka)"] -- "evict key" --&gt; L2
+  ED -- "invalidate" --&gt; L1</pre>
+<ul><li>Serve most traffic from the <strong>edge</strong> (CDN and HTTP caching headers), then a small in-process L1 cache (nanosecond hits), then shared Redis L2, then the database.</li><li><strong>Invalidation:</strong> writes publish a product-changed event; consumers evict L2 and L1 keys. Short TTLs bound staleness if an event is lost.</li><li><strong>Protect the database:</strong> <code>sync = true</code> or single-flight loading, jittered TTLs, a negative cache for unknown ids, and a circuit breaker so a Redis outage degrades to the database instead of failing.</li><li><strong>Numbers:</strong> at 20,000 rps with a 95% hit ratio, the database sees about 1,000 rps; 99% means 200 rps. State the hit-ratio target and measure it.</li><li><strong>Consistency:</strong> this design is eventually consistent; for price or stock at checkout, re-read from the source of truth.</li></ul>
+</blockquote>
+<p class="q" id="D10"><strong><span class="qid">D10</span> How do you roll out a breaking schema change (rename a column) with zero downtime? <span class="tag t-scenario">Scenario</span></strong></p>
+<blockquote>
+<p>During a rolling deployment old and new code versions run <strong>at the same time</strong> against one database, so a single-step rename would break the old instances. Use the <strong>expand and contract</strong> pattern across several releases:</p>
+<pre class="mermaid">flowchart LR
+  A["Release 1: EXPAND&lt;br/&gt;add new column, keep old"] --&gt; B["Release 2: write both&lt;br/&gt;read old, backfill data"]
+  B --&gt; C["Release 3: read new,&lt;br/&gt;still write both"]
+  C --&gt; D["Release 4: CONTRACT&lt;br/&gt;stop writing old, drop it"]</pre>
+<ol><li><strong>Expand:</strong> add <code>full_name</code> (nullable). Old code ignores it.</li><li><strong>Dual write and backfill:</strong> deploy code that writes both columns; backfill existing rows in small batches.</li><li><strong>Switch reads</strong> to the new column once data is verified.</li><li><strong>Contract:</strong> after all instances run the new code, drop the old column in a later migration.</li></ol>
+<p>Each step is independently deployable and reversible. Avoid long locks (use <code>CREATE INDEX CONCURRENTLY</code> on PostgreSQL, online DDL tools on MySQL), keep migrations small, and test them against production-sized data. Flyway runs the SQL; the discipline is in how you sequence releases.</p>
+</blockquote>
+<footer class="foot">Answers target Spring Framework 6 and Spring Boot 3 (Java 17+). Verify version-specific details against the official reference documentation before an interview.</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="../../assets/script.js"></script>
+<script src="../../assets/qa.js"></script>
+</body>
+</html>

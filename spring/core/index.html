@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Core Interview Questions | My Interview Playbook</title>
+<meta name="description" content="IoC container, dependency injection, bean scopes and lifecycle, circular dependencies and configuration.">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/qa.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+<button class="menu-btn" id="menuBtn" aria-label="Toggle contents" aria-expanded="false">Contents</button>
+<aside class="sidebar" id="sidebar">
+  <a class="back" href="../">&larr; Spring track</a>
+  <p class="side-title">On this page</p>
+  <nav>
+<a href="#top-of-page">Overview</a>
+<a href="#beginner">Beginner <span class="cnt">4</span></a>
+<a href="#intermediate">Intermediate <span class="cnt">4</span></a>
+<a href="#experienced">Experienced <span class="cnt">4</span></a>
+  </nav>
+  <p class="side-title" style="margin-top:20px">Spring topics</p>
+  <nav class="topics">
+<a href="../core/" class="here">Spring Core</a>
+<a href="../aop/">Spring AOP</a>
+<a href="../web/">Spring Web MVC</a>
+<a href="../webflux/">Spring WebFlux</a>
+<a href="../orm/">Spring ORM and Data JPA</a>
+<a href="../rest/">Spring REST API Design</a>
+<a href="../security/">Spring Security</a>
+  </nav>
+  <label class="practice"><input type="checkbox" id="practice"> Practice mode<span>Hide answers. Click a question to reveal its answer.</span></label>
+</aside>
+<main class="content">
+<header class="hero" id="top-of-page"><p class="eyebrow">Spring interview playbook</p><h1 class="doc-title">Spring Core</h1><p class="subtitle">IoC container, dependency injection, bean scopes and lifecycle, circular dependencies and configuration.</p><p class="intro">12 questions: Beginner 4 &middot; Intermediate 4 &middot; Experienced 4. Each question is tagged <span class="tag t-theory">Theory</span> <span class="tag t-coding">Coding</span> <span class="tag t-scenario">Scenario</span> <span class="tag t-design">Design</span>. Use Practice mode to hide the answers and test yourself.</p></header>
+<h2 id="beginner">Beginner</h2>
+<p class="q" id="C1"><strong><span class="qid">C1</span> What is Inversion of Control (IoC) and Dependency Injection (DI) in Spring? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>With IoC, the framework, not your code, creates objects and wires them together. Normally a class does <code>new PaymentGateway()</code> itself, which couples it to one implementation. With IoC the class only declares what it needs and the Spring container supplies it.</p>
+<p>DI is the technique Spring uses to do this: dependencies are <em>injected</em> through a constructor, setter or field.</p>
+<ul><li><strong>Benefits:</strong> loose coupling, easy unit testing (pass a mock), easy swapping of implementations, and lifecycle and cross-cutting concerns managed in one place.</li><li><strong>The container:</strong> <code>ApplicationContext</code> reads configuration (annotations, Java config, XML), creates beans, injects dependencies and manages their lifecycle.</li></ul>
+<pre class="mermaid">flowchart LR
+  CFG["Configuration&lt;br/&gt;(@Configuration, @Component, XML)"] --&gt; CTX["ApplicationContext&lt;br/&gt;(IoC container)"]
+  CTX --&gt; B1["OrderService bean"]
+  CTX --&gt; B2["PaymentGateway bean"]
+  CTX --&gt; B3["OrderRepository bean"]
+  B1 -- injected --&gt; B2
+  B1 -- injected --&gt; B3</pre>
+</blockquote>
+<p class="q" id="C2"><strong><span class="qid">C2</span> What are the types of dependency injection and which one should you prefer? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>Spring supports three styles:</p>
+<ul><li><strong>Constructor injection:</strong> dependencies are constructor parameters. Preferred.</li><li><strong>Setter injection:</strong> dependencies are set through setter methods. Good for optional dependencies.</li><li><strong>Field injection:</strong> <code>@Autowired</code> directly on a field. Avoid in application code.</li></ul>
+<p>Constructor injection is preferred because dependencies can be <code>final</code> (immutable), the object can never exist half-built, missing dependencies fail at startup, it is easy to unit test without Spring (<code>new OrderService(mockRepo)</code>), and an overly large constructor is a visible smell for a class doing too much. Field injection hides all of this and needs reflection or Spring to test.</p>
+<pre><code class="language-java">@Service
+public class OrderService {
+    private final OrderRepository repo;
+    private final PaymentGateway gateway;
+
+    // @Autowired is optional when there is a single constructor
+    public OrderService(OrderRepository repo, PaymentGateway gateway) {
+        this.repo = repo;
+        this.gateway = gateway;
+    }
+}</code></pre>
+</blockquote>
+<p class="q" id="C3"><strong><span class="qid">C3</span> What are the bean scopes in Spring? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>The scope controls how many instances the container creates.</p>
+<div class="table-wrap"><table><thead><tr><th>Scope</th><th>Instances</th><th>Notes</th></tr></thead><tbody><tr><td><code>singleton</code> (default)</td><td>One per container</td><td>Shared, so it must be thread-safe and effectively stateless</td></tr><tr><td><code>prototype</code></td><td>New one on each request for the bean</td><td>Spring does not call destroy callbacks</td></tr><tr><td><code>request</code></td><td>One per HTTP request</td><td>Web-aware contexts only</td></tr><tr><td><code>session</code></td><td>One per HTTP session</td><td>Web-aware contexts only</td></tr><tr><td><code>application</code></td><td>One per ServletContext</td><td>Web-aware contexts only</td></tr><tr><td><code>websocket</code></td><td>One per WebSocket session</td><td>Web-aware contexts only</td></tr></tbody></table></div>
+<p>Singleton means one instance per container, not one per JVM like the GoF pattern.</p>
+</blockquote>
+<p class="q" id="C4"><strong><span class="qid">C4</span> What is the difference between @Component, @Service, @Repository and @Controller? And @Bean vs @Component? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p><code>@Component</code> is the generic stereotype that marks a class for component scanning. <code>@Service</code>, <code>@Repository</code> and <code>@Controller</code> are specializations with the same registration behavior but clearer intent:</p>
+<ul><li><code>@Repository</code> also enables exception translation (vendor exceptions become Spring's <code>DataAccessException</code> hierarchy).</li><li><code>@Controller</code> is detected by Spring MVC for request mapping.</li><li><code>@Service</code> has no extra behavior; it documents the layer.</li></ul>
+<p><code>@Component</code> is <strong>class-level</strong> and found by scanning. <code>@Bean</code> is <strong>method-level</strong>, inside a <code>@Configuration</code> class, and you write the construction code yourself. Use <code>@Bean</code> for classes you do not own (a third-party <code>ObjectMapper</code>, <code>DataSource</code>) or when creation needs logic.</p>
+<pre><code class="language-java">@Configuration
+public class AppConfig {
+    @Bean
+    public Clock clock() { return Clock.systemUTC(); }
+}</code></pre>
+</blockquote>
+<h2 id="intermediate">Intermediate</h2>
+<p class="q" id="C5"><strong><span class="qid">C5</span> What is the difference between BeanFactory and ApplicationContext? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p><code>BeanFactory</code> is the basic container: it creates beans lazily and supports DI. <code>ApplicationContext</code> extends it and is what you use in practice. It adds:</p>
+<ul><li>eager creation of singletons at startup, so configuration errors surface immediately</li><li>event publication (<code>ApplicationEventPublisher</code>)</li><li>internationalization (<code>MessageSource</code>)</li><li>resource loading and environment/profile support</li><li>automatic registration of <code>BeanPostProcessor</code> and <code>BeanFactoryPostProcessor</code></li><li>integration with AOP and web contexts</li></ul>
+</blockquote>
+<p class="q" id="C6"><strong><span class="qid">C6</span> Explain the Spring bean lifecycle. <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>For a singleton bean the container does the following:</p>
+<pre class="mermaid">flowchart TD
+  A["Load bean definitions"] --&gt; B["BeanFactoryPostProcessors&lt;br/&gt;modify definitions"]
+  B --&gt; C["Instantiate bean&lt;br/&gt;(constructor)"]
+  C --&gt; D["Populate properties&lt;br/&gt;(dependency injection)"]
+  D --&gt; E["Aware callbacks&lt;br/&gt;BeanNameAware, ApplicationContextAware"]
+  E --&gt; F["BeanPostProcessor&lt;br/&gt;postProcessBeforeInitialization"]
+  F --&gt; G["@PostConstruct, InitializingBean.afterPropertiesSet, init-method"]
+  G --&gt; H["BeanPostProcessor&lt;br/&gt;postProcessAfterInitialization&lt;br/&gt;(AOP proxies are created here)"]
+  H --&gt; I["Bean ready for use"]
+  I --&gt; J["Context closing:&lt;br/&gt;@PreDestroy, DisposableBean.destroy, destroy-method"]</pre>
+<p>Key interview points: injection happens <em>before</em> <code>@PostConstruct</code>, so the init method can safely use injected fields; AOP proxies are produced in <code>postProcessAfterInitialization</code>; prototype beans are not destroyed by the container.</p>
+</blockquote>
+<p class="q" id="C7"><strong><span class="qid">C7</span> How does Spring resolve which bean to inject? What if there are multiple candidates? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Spring autowires <strong>by type</strong> first. If more than one bean matches, it narrows by <code>@Primary</code>, then <code>@Qualifier</code>, then falls back to matching the parameter or field <strong>name</strong> to a bean name. If still ambiguous it throws <code>NoUniqueBeanDefinitionException</code>. If none match it throws <code>NoSuchBeanDefinitionException</code> (unless the dependency is optional).</p>
+<pre><code class="language-java">public interface PaymentGateway { void pay(Money m); }
+
+@Component @Primary
+class StripeGateway implements PaymentGateway { /* ... */ }
+
+@Component("paypal")
+class PaypalGateway implements PaymentGateway { /* ... */ }
+
+@Service
+class CheckoutService {
+    CheckoutService(PaymentGateway defaultGateway,                 // StripeGateway (@Primary)
+                    @Qualifier("paypal") PaymentGateway paypal) {} // explicit choice
+}</code></pre>
+<p>To inject <em>all</em> implementations, ask for <code>List&lt;PaymentGateway&gt;</code> or <code>Map&lt;String, PaymentGateway&gt;</code> (bean name to bean). This is the usual way to build a strategy registry.</p>
+</blockquote>
+<p class="q" id="C8"><strong><span class="qid">C8</span> What are circular dependencies and how does Spring handle them? <span class="tag t-scenario">Scenario</span></strong></p>
+<blockquote>
+<p>A circular dependency is when A needs B and B needs A. With constructor injection neither can be created first, so Spring throws <code>BeanCurrentlyInCreationException</code>. Setter or field injection on singletons used to work because Spring exposes an early reference from its three-level singleton cache. <strong>Since Spring Boot 2.6 circular references are prohibited by default</strong> (<code>spring.main.allow-circular-references=false</code>).</p>
+<p>Treat a cycle as a design smell, not something to switch back on. Fixes, best first:</p>
+<ol><li>Extract the shared behavior into a third class both depend on, or move one responsibility.</li><li>Invert one direction with an event (<code>ApplicationEventPublisher</code>) or an interface.</li><li>As a last resort, break the cycle with <code>@Lazy</code> on one constructor parameter, which injects a lazy proxy.</li></ol>
+<pre><code class="language-java">@Service
+class A {
+    A(@Lazy B b) { this.b = b; }   // B is resolved on first use
+    private final B b;
+}</code></pre>
+</blockquote>
+<h2 id="experienced">Experienced</h2>
+<p class="q" id="C9"><strong><span class="qid">C9</span> A singleton bean needs a new instance of a prototype bean on every call. Why does plain injection not work and what are the options? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>The singleton is created once, so its prototype dependency is injected once and then reused forever. The prototype scope is effectively lost.</p>
+<p>Options:</p>
+<ul><li><strong><code>ObjectProvider&lt;T&gt;</code></strong> (recommended): call <code>getObject()</code> each time to get a fresh instance.</li><li><strong><code>@Lookup</code></strong> method injection: Spring overrides the method (CGLIB) to return a new bean each call.</li><li><strong>Scoped proxy</strong>: <code>@Scope(value = "prototype", proxyMode = ScopedProxyMode.TARGET_CLASS)</code> injects a proxy that resolves the real bean per call.</li></ul>
+<pre><code class="language-java">@Component @Scope("prototype")
+class ReportBuilder { /* holds per-report state */ }
+
+@Service
+class ReportService {
+    private final ObjectProvider&lt;ReportBuilder&gt; builders;
+    ReportService(ObjectProvider&lt;ReportBuilder&gt; builders) { this.builders = builders; }
+
+    Report generate() {
+        ReportBuilder b = builders.getObject();   // new instance every call
+        return b.build();
+    }
+}</code></pre>
+<p>The same issue appears with <code>request</code> and <code>session</code> scoped beans injected into singletons, which is why those need scoped proxies.</p>
+</blockquote>
+<p class="q" id="C10"><strong><span class="qid">C10</span> What is the difference between @Configuration "full" mode and "lite" mode, and what does proxyBeanMethods do? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>Spring subclasses a <code>@Configuration</code> class with CGLIB so that calling one <code>@Bean</code> method from another returns the <strong>existing singleton</strong> rather than creating a new object. That is "full" mode.</p>
+<pre><code class="language-java">@Configuration   // proxyBeanMethods = true by default
+class Config {
+    @Bean A a() { return new A(b()); }   // b() returns the container's singleton B
+    @Bean B b() { return new B(); }
+}</code></pre>
+<p>With <code>@Configuration(proxyBeanMethods = false)</code> (also called lite mode, and how <code>@Component</code> or plain classes with <code>@Bean</code> behave) no proxy is created, so <code>b()</code> would build a new <code>B</code>. Lite mode starts faster and uses less memory and is what Spring Boot's own auto-configurations use. Use it when your <code>@Bean</code> methods do not call each other, and take dependencies as method parameters instead:</p>
+<pre><code class="language-java">@Bean A a(B b) { return new A(b); }</code></pre>
+</blockquote>
+<p class="q" id="C11"><strong><span class="qid">C11</span> How do Spring application events work, and why use @TransactionalEventListener? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p><code>ApplicationEventPublisher</code> lets beans publish events that other beans consume with <code>@EventListener</code>, decoupling producers from consumers inside one application. Listeners run <strong>synchronously on the publisher's thread</strong> by default, unless the listener is also <code>@Async</code>.</p>
+<pre><code class="language-java">record OrderPlaced(Long orderId) {}
+
+@Service
+class OrderService {
+    private final ApplicationEventPublisher events;
+    private final OrderRepository repo;
+    OrderService(ApplicationEventPublisher events, OrderRepository repo) { this.events = events; this.repo = repo; }
+
+    @Transactional
+    public void place(Order o) {
+        repo.save(o);
+        events.publishEvent(new OrderPlaced(o.getId()));
+    }
+}
+
+@Component
+class EmailListener {
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Async
+    void on(OrderPlaced e) { /* send confirmation email */ }
+}</code></pre>
+<p>A plain <code>@EventListener</code> would send the email even if the transaction later rolls back. <code>@TransactionalEventListener(AFTER_COMMIT)</code> fires only after a successful commit. Caveat: the event is lost if the process crashes between commit and handling, so for guaranteed delivery to other systems use the transactional outbox pattern instead.</p>
+</blockquote>
+<p class="q" id="C12"><strong><span class="qid">C12</span> Design a payment module where the provider (Stripe, PayPal, Razorpay) is chosen per request and new providers can be added without changing existing code. <span class="tag t-design">Design</span></strong></p>
+<blockquote>
+<p>Use the <strong>strategy pattern</strong> with Spring collecting all implementations.</p>
+<pre class="mermaid">flowchart LR
+  C["PaymentController"] --&gt; S["PaymentService"]
+  S --&gt; R["PaymentGatewayRegistry&lt;br/&gt;Map name to PaymentGateway"]
+  R --&gt; A["StripeGateway"]
+  R --&gt; B["PaypalGateway"]
+  R --&gt; D["RazorpayGateway"]
+  S --&gt; T["Transaction log&lt;br/&gt;(@Transactional)"]</pre>
+<pre><code class="language-java">public interface PaymentGateway {
+    String provider();                       // "stripe", "paypal"
+    PaymentResult charge(PaymentRequest r);
+}
+
+@Component
+class PaymentGatewayRegistry {
+    private final Map&lt;String, PaymentGateway&gt; byProvider;
+
+    PaymentGatewayRegistry(List&lt;PaymentGateway&gt; gateways) {   // Spring injects all implementations
+        this.byProvider = gateways.stream()
+            .collect(Collectors.toMap(PaymentGateway::provider, Function.identity()));
+    }
+
+    PaymentGateway get(String provider) {
+        PaymentGateway g = byProvider.get(provider);
+        if (g == null) throw new UnsupportedProviderException(provider);
+        return g;
+    }
+}</code></pre>
+<p>Adding a provider means adding one new <code>@Component</code>: no <code>if/else</code> chain changes (open/closed principle). Enable or disable providers per environment with <code>@ConditionalOnProperty</code>, and wrap each gateway call with timeouts, retries and a circuit breaker.</p>
+</blockquote>
+<footer class="foot">Answers target Spring Framework 6 and Spring Boot 3 (Java 17+). Verify version-specific details against the official reference documentation before an interview.</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="../../assets/script.js"></script>
+<script src="../../assets/qa.js"></script>
+</body>
+</html>

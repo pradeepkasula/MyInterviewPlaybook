@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring ORM and Data JPA Interview Questions | My Interview Playbook</title>
+<meta name="description" content="JPA, Hibernate and Spring Data, lazy loading, N+1, transactions, locking, batching and read-replica routing.">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/qa.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+<button class="menu-btn" id="menuBtn" aria-label="Toggle contents" aria-expanded="false">Contents</button>
+<aside class="sidebar" id="sidebar">
+  <a class="back" href="../">&larr; Spring track</a>
+  <p class="side-title">On this page</p>
+  <nav>
+<a href="#top-of-page">Overview</a>
+<a href="#beginner">Beginner <span class="cnt">3</span></a>
+<a href="#intermediate">Intermediate <span class="cnt">4</span></a>
+<a href="#experienced">Experienced <span class="cnt">4</span></a>
+  </nav>
+  <p class="side-title" style="margin-top:20px">Spring topics</p>
+  <nav class="topics">
+<a href="../core/">Spring Core</a>
+<a href="../aop/">Spring AOP</a>
+<a href="../web/">Spring Web MVC</a>
+<a href="../webflux/">Spring WebFlux</a>
+<a href="../orm/" class="here">Spring ORM and Data JPA</a>
+<a href="../rest/">Spring REST API Design</a>
+<a href="../security/">Spring Security</a>
+  </nav>
+  <label class="practice"><input type="checkbox" id="practice"> Practice mode<span>Hide answers. Click a question to reveal its answer.</span></label>
+</aside>
+<main class="content">
+<header class="hero" id="top-of-page"><p class="eyebrow">Spring interview playbook</p><h1 class="doc-title">Spring ORM and Data JPA</h1><p class="subtitle">JPA, Hibernate and Spring Data, lazy loading, N+1, transactions, locking, batching and read-replica routing.</p><p class="intro">11 questions: Beginner 3 &middot; Intermediate 4 &middot; Experienced 4. Each question is tagged <span class="tag t-theory">Theory</span> <span class="tag t-coding">Coding</span> <span class="tag t-scenario">Scenario</span> <span class="tag t-design">Design</span>. Use Practice mode to hide the answers and test yourself.</p></header>
+<h2 id="beginner">Beginner</h2>
+<p class="q" id="O1"><strong><span class="qid">O1</span> What is the difference between JPA, Hibernate and Spring Data JPA? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<ul><li><strong>JPA (Jakarta Persistence)</strong> is a <strong>specification</strong>: annotations (<code>@Entity</code>, <code>@Id</code>) and the <code>EntityManager</code> API. It is only interfaces.</li><li><strong>Hibernate</strong> is the most common <strong>implementation</strong> of JPA (plus extra features of its own).</li><li><strong>Spring Data JPA</strong> is a Spring layer on top that <strong>generates repository implementations</strong> from interfaces, so you rarely write <code>EntityManager</code> code or boilerplate DAOs.</li><li><strong>Spring ORM</strong> is the older Spring module with helper classes (<code>LocalContainerEntityManagerFactoryBean</code>, <code>JpaTransactionManager</code>) that integrate JPA/Hibernate with Spring transactions.</li></ul>
+<pre class="mermaid">flowchart TD
+  S["Service layer"] --&gt; R["Spring Data JPA repository&lt;br/&gt;(generated proxy)"]
+  R --&gt; J["JPA API: EntityManager"]
+  J --&gt; H["Hibernate&lt;br/&gt;(JPA provider)"]
+  H --&gt; D["JDBC driver + HikariCP pool"]
+  D --&gt; DB[("Database")]</pre>
+</blockquote>
+<p class="q" id="O2"><strong><span class="qid">O2</span> What is the difference between CrudRepository, JpaRepository and PagingAndSortingRepository? How do derived queries work? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<ul><li><code>CrudRepository</code>: basic create/read/update/delete.</li><li><code>PagingAndSortingRepository</code>: adds <code>findAll(Pageable)</code> and <code>findAll(Sort)</code>.</li><li><code>JpaRepository</code>: extends both and adds JPA-specific methods (<code>flush</code>, <code>saveAllAndFlush</code>, <code>deleteAllInBatch</code>, <code>getReferenceById</code>).</li></ul>
+<p>Spring Data parses <strong>method names</strong> into queries, or you write them with <code>@Query</code>.</p>
+<pre><code class="language-java">public interface BookRepository extends JpaRepository&lt;Book, Long&gt; {
+
+    List&lt;Book&gt; findByAuthorAndYearGreaterThan(String author, int year);   // derived query
+
+    @Query("select b from Book b where lower(b.title) like lower(concat('%', :q, '%'))")
+    Page&lt;Book&gt; search(@Param("q") String q, Pageable pageable);          // JPQL
+
+    @Query(value = "select * from books where isbn = :isbn", nativeQuery = true)
+    Optional&lt;Book&gt; findByIsbnNative(@Param("isbn") String isbn);          // native SQL
+
+    @Modifying
+    @Query("update Book b set b.stock = b.stock - :n where b.id = :id and b.stock &gt;= :n")
+    int decrementStock(@Param("id") Long id, @Param("n") int n);          // returns rows changed
+}</code></pre>
+</blockquote>
+<p class="q" id="O3"><strong><span class="qid">O3</span> Map a one-to-many relationship between Author and Book correctly. <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Own the relationship on the <strong>many side</strong> (the table with the foreign key) and keep both sides in sync.</p>
+<pre><code class="language-java">@Entity
+public class Author {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String name;
+
+    @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List&lt;Book&gt; books = new ArrayList&lt;&gt;();
+
+    public void addBook(Book b) { books.add(b); b.setAuthor(this); }      // keep both sides consistent
+    public void removeBook(Book b) { books.remove(b); b.setAuthor(null); }
+}
+
+@Entity
+public class Book {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String title;
+
+    @ManyToOne(fetch = FetchType.LAZY)             // default for ToOne is EAGER, so set LAZY
+    @JoinColumn(name = "author_id")
+    private Author author;
+}</code></pre>
+<p><code>mappedBy</code> marks the inverse side, so no extra join table is created. Prefer <code>LAZY</code> everywhere and fetch what you need per query. Override <code>equals</code>/<code>hashCode</code> carefully (use a business key or the id with a constant <code>hashCode</code>), never include lazy collections in <code>toString</code>, and do not expose entities directly in REST responses (use DTOs).</p>
+</blockquote>
+<h2 id="intermediate">Intermediate</h2>
+<p class="q" id="O4"><strong><span class="qid">O4</span> What is the difference between LAZY and EAGER fetching? What causes LazyInitializationException? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<ul><li><code>LAZY</code>: related data is loaded on first access, through a proxy or lazy collection.</li><li><code>EAGER</code>: loaded immediately with the owner, often through extra joins or queries you cannot turn off per use case.</li></ul>
+<p>Defaults: <code>@OneToMany</code> and <code>@ManyToMany</code> are LAZY; <code>@ManyToOne</code> and <code>@OneToOne</code> are EAGER. Prefer LAZY and fetch explicitly.</p>
+<p><code>LazyInitializationException</code> happens when you touch an uninitialized lazy association <strong>after the persistence context (session) has closed</strong>, typically when the entity is serialized in the controller. Fixes: load the data you need inside the transaction using a fetch join or <code>@EntityGraph</code>; map to a <strong>DTO inside the service</strong>; or use projections. Avoid "fixing" it with <code>spring.jpa.open-in-view=true</code> (the Boot default), which keeps a connection open for the whole HTTP request and hides inefficient queries. Many teams set it to <code>false</code>.</p>
+</blockquote>
+<p class="q" id="O5"><strong><span class="qid">O5</span> What is the N+1 select problem and how do you fix it? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Loading N parents with one query, then triggering one extra query <strong>per parent</strong> to load a lazy child, gives 1 + N queries.</p>
+<pre><code class="language-java">List&lt;Author&gt; authors = authorRepo.findAll();                  // 1 query
+authors.forEach(a -&gt; System.out.println(a.getBooks().size()));  // N more queries (one per author)</code></pre>
+<pre class="mermaid">sequenceDiagram
+  participant S as Service
+  participant DB as Database
+  S-&gt;&gt;DB: select * from author
+  DB--&gt;&gt;S: 100 rows
+  loop for each author
+    S-&gt;&gt;DB: select * from book where author_id = ?
+  end
+  Note over S,DB: 101 queries instead of 1 or 2</pre>
+<p>Fixes:</p>
+<pre><code class="language-java">public interface AuthorRepository extends JpaRepository&lt;Author, Long&gt; {
+
+    @Query("select distinct a from Author a join fetch a.books")          // 1. fetch join
+    List&lt;Author&gt; findAllWithBooks();
+
+    @EntityGraph(attributePaths = "books")                                 // 2. entity graph
+    List&lt;Author&gt; findByNameContaining(String name);
+}</code></pre>
+<ol><li><code>@BatchSize(size = 50)</code> or <code>hibernate.default_batch_fetch_size=50</code> loads children in batches (<code>where author_id in (...)</code>), which works well with pagination.</li><li>A <strong>DTO projection</strong> selecting only needed columns.</li></ol>
+<p>Caveat: a fetch join on a collection <strong>breaks database pagination</strong> (Hibernate paginates in memory and warns <code>HHH90003004</code>). For paged lists, fetch the page of parents first, then load children with batch fetching or a second query. Detect N+1 in development with <code>hibernate.generate_statistics</code> or a query counter in tests.</p>
+</blockquote>
+<p class="q" id="O6"><strong><span class="qid">O6</span> Explain the persistence context and entity states. What is dirty checking and flush? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>The <strong>persistence context</strong> (first-level cache) is a per-transaction map of managed entities. Entities move between states:</p>
+<pre class="mermaid">stateDiagram-v2
+  [*] --&gt; Transient: new Entity()
+  Transient --&gt; Managed: persist() or save()
+  Managed --&gt; Detached: transaction ends, detach(), clear()
+  Detached --&gt; Managed: merge()
+  Managed --&gt; Removed: remove()
+  Removed --&gt; [*]: commit
+  Managed --&gt; Managed: find() returns same instance</pre>
+<ul><li><strong>Managed:</strong> tracked; changes are detected automatically.</li><li><strong>Dirty checking:</strong> at flush, Hibernate compares each managed entity with its loaded snapshot and issues <code>UPDATE</code> for changes, so you do <strong>not</strong> need to call <code>save()</code> inside a transaction after modifying a managed entity.</li><li><strong>Flush:</strong> synchronizes memory with the database (before commit, before a query that may be affected under <code>FlushMode.AUTO</code>, or manually). Flush is not commit.</li><li>The first-level cache means <code>findById</code> twice in one transaction returns the same object with one query.</li></ul>
+</blockquote>
+<p class="q" id="O7"><strong><span class="qid">O7</span> Explain @Transactional propagation, isolation and rollback rules. <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p><strong>Propagation</strong> decides what happens when a transactional method calls another:</p>
+<div class="table-wrap"><table><thead><tr><th>Propagation</th><th>Behavior</th></tr></thead><tbody><tr><td><code>REQUIRED</code> (default)</td><td>Join the existing transaction, or start one</td></tr><tr><td><code>REQUIRES_NEW</code></td><td>Suspend the current one and start a new independent transaction</td></tr><tr><td><code>NESTED</code></td><td>A savepoint inside the current transaction (JDBC; not supported by JPA providers in all setups)</td></tr><tr><td><code>SUPPORTS</code> / <code>NOT_SUPPORTED</code></td><td>Run in a transaction if one exists / always run without one</td></tr><tr><td><code>MANDATORY</code> / <code>NEVER</code></td><td>Must have one / must not have one, otherwise an exception</td></tr></tbody></table></div>
+<p><strong>Isolation</strong> controls visibility between concurrent transactions: <code>READ_COMMITTED</code> (common default), <code>REPEATABLE_READ</code>, <code>SERIALIZABLE</code>. Higher levels prevent more anomalies (non-repeatable reads, phantoms) at the cost of concurrency; the exact behavior is database-specific.</p>
+<p><strong>Rollback rules:</strong> only unchecked exceptions and errors roll back by default; use <code>rollbackFor</code> for checked ones. A <code>REQUIRES_NEW</code> method must be called <strong>through another bean</strong> (proxy), otherwise it silently joins the caller's transaction. Use <code>readOnly = true</code> for queries to skip dirty checking and allow driver optimizations.</p>
+<pre><code class="language-java">@Service
+class OrderService {
+    @Transactional
+    public void placeOrder(Order o) {
+        orderRepo.save(o);
+        auditService.log(o);          // auditService.log is REQUIRES_NEW: audit survives a rollback of the order
+    }
+}</code></pre>
+</blockquote>
+<h2 id="experienced">Experienced</h2>
+<p class="q" id="O8"><strong><span class="qid">O8</span> Two users buy the last item at the same time. How do you prevent overselling? <span class="tag t-scenario">Scenario</span></strong></p>
+<blockquote>
+<p>This is a lost-update race: both read <code>stock = 1</code>, both write <code>0</code>, and you sell two items.</p>
+<p>Options, from lightest to strongest:</p>
+<ol><li><strong>Optimistic locking</strong> with <code>@Version</code>: the update includes <code>where version = ?</code>; the loser gets <code>OptimisticLockingFailureException</code> and retries or reports a conflict. Best when conflicts are rare.</li><li><strong>Atomic conditional update</strong>: let the database enforce the rule in one statement (no read-modify-write).</li><li><strong>Pessimistic locking</strong>: <code>SELECT ... FOR UPDATE</code> blocks others. Use for high-contention rows, but keep the transaction short to avoid deadlocks and pool exhaustion.</li></ol>
+<pre><code class="language-java">@Entity
+class Product {
+    @Id Long id;
+    int stock;
+    @Version long version;          // optimistic lock
+}
+
+// 2. atomic: returns 0 if there was not enough stock
+@Modifying
+@Query("update Product p set p.stock = p.stock - :qty where p.id = :id and p.stock &gt;= :qty")
+int reserve(@Param("id") Long id, @Param("qty") int qty);
+
+// 3. pessimistic
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@Query("select p from Product p where p.id = :id")
+Optional&lt;Product&gt; findForUpdate(@Param("id") Long id);</code></pre>
+<pre class="mermaid">sequenceDiagram
+  participant A as User A
+  participant B as User B
+  participant DB as Database
+  A-&gt;&gt;DB: read stock=1, version=5
+  B-&gt;&gt;DB: read stock=1, version=5
+  A-&gt;&gt;DB: update stock=0 where version=5
+  DB--&gt;&gt;A: 1 row updated (version 6)
+  B-&gt;&gt;DB: update stock=0 where version=5
+  DB--&gt;&gt;B: 0 rows, OptimisticLockException</pre>
+<p>For a flash sale prefer the atomic update (or Redis <code>DECR</code>) combined with idempotent order creation.</p>
+</blockquote>
+<p class="q" id="O9"><strong><span class="qid">O9</span> You must insert 1 million rows. saveAll() is very slow. Why, and how do you speed it up? <span class="tag t-scenario">Scenario</span></strong></p>
+<blockquote>
+<p>Reasons: one round trip per row; with <code>GenerationType.IDENTITY</code> Hibernate <strong>must insert each row immediately</strong> to obtain the id, which disables JDBC batching; and a huge persistence context keeps every entity in memory and slows dirty checking.</p>
+<p>Fixes:</p>
+<pre><code class="language-properties">spring.jpa.properties.hibernate.jdbc.batch_size=500
+spring.jpa.properties.hibernate.order_inserts=true
+spring.jpa.properties.hibernate.order_updates=true
+# MySQL: also add rewriteBatchedStatements=true to the JDBC URL
+# PostgreSQL: reWriteBatchedInserts=true</code></pre>
+<pre><code class="language-java">@Transactional
+public void importAll(Iterator&lt;Row&gt; rows) {
+    int i = 0;
+    while (rows.hasNext()) {
+        em.persist(toEntity(rows.next()));
+        if (++i % 500 == 0) { em.flush(); em.clear(); }   // push the batch, free memory
+    }
+}</code></pre>
+<ul><li>Use a <strong>sequence</strong> generator (<code>GenerationType.SEQUENCE</code> with <code>allocationSize</code> 50) instead of <code>IDENTITY</code> so batching works.</li><li>For truly bulk loads skip the ORM: <code>JdbcTemplate.batchUpdate</code>, or database tools such as PostgreSQL <code>COPY</code> / MySQL <code>LOAD DATA</code>.</li><li>Process in chunks with separate short transactions (Spring Batch gives chunking, restart and skip logic).</li></ul>
+</blockquote>
+<p class="q" id="O10"><strong><span class="qid">O10</span> How do you size and tune HikariCP, and what happens when the pool is exhausted? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>The pool limits concurrent database connections. A connection is held from the start of a transaction (or first query) until it ends. When all are in use, threads wait up to <code>connectionTimeout</code> (default 30 s) and then fail with <code>SQLTransientConnectionException: ... Connection is not available</code>.</p>
+<p>Sizing: bigger is not better. A good starting point is <code>pool size ≈ (core_count * 2) + effective_spindle_count</code>, often <strong>10 to 20</strong> per instance, then measure. Remember <code>instances x pool size</code> must stay below the database <code>max_connections</code>.</p>
+<pre><code class="language-properties">spring.datasource.hikari.maximum-pool-size=15
+spring.datasource.hikari.minimum-idle=15
+spring.datasource.hikari.connection-timeout=5000
+spring.datasource.hikari.max-lifetime=1740000     # below the DB or proxy idle timeout
+spring.datasource.hikari.leak-detection-threshold=20000</code></pre>
+<p>Common root causes of exhaustion: long transactions that call slow external APIs while holding a connection; N+1 queries; <code>open-in-view</code> keeping connections for the whole request; missing timeouts. Fix the cause (shorter transactions, no remote calls inside <code>@Transactional</code>) before raising the pool size. Watch <code>hikaricp.connections.active</code> and <code>hikaricp.connections.pending</code> metrics.</p>
+</blockquote>
+<p class="q" id="O11"><strong><span class="qid">O11</span> Design read/write splitting across a primary and read replicas in Spring. <span class="tag t-design">Design</span></strong></p>
+<blockquote>
+<p>Route writes to the primary and read-only transactions to replicas using <code>AbstractRoutingDataSource</code>, keyed by the transaction's read-only flag.</p>
+<pre class="mermaid">flowchart LR
+  S["Service&lt;br/&gt;@Transactional(readOnly = true/false)"] --&gt; R["RoutingDataSource"]
+  R -- "write" --&gt; P[("Primary")]
+  R -- "read-only" --&gt; R1[("Replica 1")]
+  R -- "read-only" --&gt; R2[("Replica 2")]
+  P -. "async replication" .-&gt; R1
+  P -. "async replication" .-&gt; R2</pre>
+<pre><code class="language-java">class RoutingDataSource extends AbstractRoutingDataSource {
+    @Override
+    protected Object determineCurrentLookupKey() {
+        return TransactionSynchronizationManager.isCurrentTransactionReadOnly() ? "replica" : "primary";
+    }
+}
+
+@Bean
+DataSource dataSource(DataSource primary, DataSource replica) {
+    RoutingDataSource ds = new RoutingDataSource();
+    ds.setTargetDataSources(Map.of("primary", primary, "replica", replica));
+    ds.setDefaultTargetDataSource(primary);
+    // wrap in LazyConnectionDataSourceProxy so the route is chosen after the transaction flags are set
+    return new LazyConnectionDataSourceProxy(ds);
+}</code></pre>
+<p>Trade-offs to discuss: <strong>replication lag</strong> means a user may not see their own write, so read from the primary right after a write (read-your-writes) or for sensitive flows; keep connection pools separate per target; fail over gracefully if a replica is down; and monitor lag. Managed options (Aurora reader endpoints, proxy layers) can remove this code.</p>
+</blockquote>
+<footer class="foot">Answers target Spring Framework 6 and Spring Boot 3 (Java 17+). Verify version-specific details against the official reference documentation before an interview.</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="../../assets/script.js"></script>
+<script src="../../assets/qa.js"></script>
+</body>
+</html>

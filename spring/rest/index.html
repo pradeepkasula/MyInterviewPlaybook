@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring REST API Design Interview Questions | My Interview Playbook</title>
+<meta name="description" content="REST principles, status codes, versioning, pagination, error format, idempotency, caching and designing a rate-limited public API.">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/qa.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+<button class="menu-btn" id="menuBtn" aria-label="Toggle contents" aria-expanded="false">Contents</button>
+<aside class="sidebar" id="sidebar">
+  <a class="back" href="../">&larr; Spring track</a>
+  <p class="side-title">On this page</p>
+  <nav>
+<a href="#top-of-page">Overview</a>
+<a href="#beginner">Beginner <span class="cnt">3</span></a>
+<a href="#intermediate">Intermediate <span class="cnt">4</span></a>
+<a href="#experienced">Experienced <span class="cnt">3</span></a>
+  </nav>
+  <p class="side-title" style="margin-top:20px">Spring topics</p>
+  <nav class="topics">
+<a href="../core/">Spring Core</a>
+<a href="../aop/">Spring AOP</a>
+<a href="../web/">Spring Web MVC</a>
+<a href="../webflux/">Spring WebFlux</a>
+<a href="../orm/">Spring ORM and Data JPA</a>
+<a href="../rest/" class="here">Spring REST API Design</a>
+<a href="../security/">Spring Security</a>
+  </nav>
+  <label class="practice"><input type="checkbox" id="practice"> Practice mode<span>Hide answers. Click a question to reveal its answer.</span></label>
+</aside>
+<main class="content">
+<header class="hero" id="top-of-page"><p class="eyebrow">Spring interview playbook</p><h1 class="doc-title">Spring REST API Design</h1><p class="subtitle">REST principles, status codes, versioning, pagination, error format, idempotency, caching and designing a rate-limited public API.</p><p class="intro">10 questions: Beginner 3 &middot; Intermediate 4 &middot; Experienced 3. Each question is tagged <span class="tag t-theory">Theory</span> <span class="tag t-coding">Coding</span> <span class="tag t-scenario">Scenario</span> <span class="tag t-design">Design</span>. Use Practice mode to hide the answers and test yourself.</p></header>
+<h2 id="beginner">Beginner</h2>
+<p class="q" id="R1"><strong><span class="qid">R1</span> What are the REST principles and which HTTP methods are safe and idempotent? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>REST is an architectural style over HTTP. Core constraints: <strong>client-server</strong>, <strong>stateless</strong> (each request carries everything needed), <strong>cacheable</strong>, a <strong>uniform interface</strong> (resources identified by URIs, manipulated through representations, standard methods), and a layered system.</p>
+<div class="table-wrap"><table><thead><tr><th>Method</th><th>Purpose</th><th>Safe</th><th>Idempotent</th></tr></thead><tbody><tr><td><code>GET</code></td><td>Read</td><td>Yes</td><td>Yes</td></tr><tr><td><code>POST</code></td><td>Create / non-idempotent action</td><td>No</td><td><strong>No</strong></td></tr><tr><td><code>PUT</code></td><td>Replace a resource</td><td>No</td><td>Yes</td></tr><tr><td><code>PATCH</code></td><td>Partial update</td><td>No</td><td>Not guaranteed</td></tr><tr><td><code>DELETE</code></td><td>Remove</td><td>No</td><td>Yes</td></tr></tbody></table></div>
+<p><em>Safe</em> means no state change. <em>Idempotent</em> means repeating the call has the same effect as making it once (the second <code>DELETE</code> may return <code>404</code>, but the state is the same). Idempotency is what makes retries safe.</p>
+<p>Design tips: use <strong>nouns, plural, lowercase</strong> (<code>/orders/42/items</code>), not verbs (<code>/getOrder</code>); keep URLs shallow; use query parameters for filtering.</p>
+</blockquote>
+<p class="q" id="R2"><strong><span class="qid">R2</span> Which HTTP status codes should an API return, and when? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<ul><li><strong>200 OK</strong>: success with a body. <strong>201 Created</strong>: resource created, with a <code>Location</code> header. <strong>204 No Content</strong>: success with no body (delete, some updates).</li><li><strong>400 Bad Request</strong>: malformed or invalid input. <strong>401 Unauthorized</strong>: not authenticated (missing or bad credentials). <strong>403 Forbidden</strong>: authenticated but not allowed. <strong>404 Not Found</strong>. <strong>405 Method Not Allowed</strong>. <strong>409 Conflict</strong>: state conflict, duplicate, optimistic-lock failure. <strong>415 Unsupported Media Type</strong>. <strong>422 Unprocessable Entity</strong>: semantic validation errors (some teams use 400). <strong>429 Too Many Requests</strong>.</li><li><strong>500 Internal Server Error</strong>: your bug. <strong>502 / 503 / 504</strong>: bad gateway, unavailable, timeout from upstream.</li></ul>
+<p>Common mistake: returning <code>200</code> with <code>{"error": ...}</code>. Clients, caches and monitoring rely on the status code.</p>
+</blockquote>
+<p class="q" id="R3"><strong><span class="qid">R3</span> Build a CRUD REST controller for a Book resource with correct status codes. <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<pre><code class="language-java">@RestController
+@RequestMapping("/api/v1/books")
+class BookController {
+    private final BookService service;
+    BookController(BookService service) { this.service = service; }
+
+    @GetMapping("/{id}")
+    BookDto get(@PathVariable Long id) { return service.get(id); }          // 200, or 404 via exception
+
+    @PostMapping
+    ResponseEntity&lt;BookDto&gt; create(@Valid @RequestBody CreateBookRequest req) {
+        BookDto created = service.create(req);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}").buildAndExpand(created.id()).toUri();
+        return ResponseEntity.created(location).body(created);              // 201 + Location header
+    }
+
+    @PutMapping("/{id}")
+    BookDto replace(@PathVariable Long id, @Valid @RequestBody UpdateBookRequest req) {
+        return service.replace(id, req);                                    // 200
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void delete(@PathVariable Long id) { service.delete(id); }              // 204
+}</code></pre>
+<p>Controllers should be thin: translate HTTP to a service call and back; keep business rules and transactions in the service layer and use DTOs (records) at the boundary, not JPA entities.</p>
+</blockquote>
+<h2 id="intermediate">Intermediate</h2>
+<p class="q" id="R4"><strong><span class="qid">R4</span> What are the strategies for API versioning, and which would you choose? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<div class="table-wrap"><table><thead><tr><th>Strategy</th><th>Example</th><th>Notes</th></tr></thead><tbody><tr><td>URI path</td><td><code>/api/v1/books</code></td><td>Most common, visible, easy to route and cache</td></tr><tr><td>Header</td><td><code>X-API-Version: 2</code></td><td>Clean URLs, harder to test in a browser</td></tr><tr><td>Media type</td><td><code>Accept: application/vnd.shop.v2+json</code></td><td>Most "RESTful", most complex</td></tr><tr><td>Query param</td><td><code>/books?version=2</code></td><td>Simple, but clutters caches and URLs</td></tr></tbody></table></div>
+<p>A pragmatic default is <strong>URI versioning</strong>. More important than the mechanism is <strong>avoiding breaking changes</strong>: only add optional fields, never remove or rename, keep old behavior until clients migrate, publish a deprecation policy (<code>Deprecation</code> and <code>Sunset</code> headers), and run old and new versions side by side. Newer Spring versions (Framework 7 / Boot 4) add built-in API versioning support; on Spring 6 you map the version in the path or write a custom <code>RequestCondition</code>. Check the reference for your version.</p>
+</blockquote>
+<p class="q" id="R5"><strong><span class="qid">R5</span> How do you design pagination, filtering and sorting? Offset vs cursor pagination? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<pre><code class="language-java">@GetMapping
+Page&lt;BookDto&gt; list(@RequestParam(required = false) String author,
+                   @PageableDefault(size = 20, sort = "title") Pageable pageable) {
+    return service.search(author, pageable);        // ?author=x&amp;page=2&amp;size=20&amp;sort=year,desc
+}</code></pre>
+<div class="table-wrap"><table><thead><tr><th></th><th>Offset (<code>page</code>, <code>size</code>)</th><th>Cursor / keyset (<code>after=&lt;last id&gt;</code>)</th></tr></thead><tbody><tr><td>Simplicity</td><td>Easy, jump to any page</td><td>Slightly harder, next/previous only</td></tr><tr><td>Large data</td><td><code>OFFSET 1000000</code> gets slow</td><td>Constant speed: <code>where id &gt; :last order by id limit 20</code></td></tr><tr><td>Consistency</td><td>Rows shift when data changes (duplicates, skips)</td><td>Stable while data changes</td></tr></tbody></table></div>
+<p>Use offset for small admin tables and cursor/keyset for large, fast-changing feeds. Always <strong>cap <code>size</code></strong> (for example 100) so clients cannot request millions of rows, and return metadata (total, next cursor, links). Spring Data 3.1+ offers <code>ScrollPosition</code> for keyset scrolling.</p>
+</blockquote>
+<p class="q" id="R6"><strong><span class="qid">R6</span> What error format should a REST API return? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Use a consistent machine-readable error body. Spring 6 supports <strong>RFC 7807 Problem Details</strong> natively; enable it for built-in MVC exceptions with <code>spring.mvc.problemdetails.enabled=true</code>.</p>
+<pre><code class="language-json">{
+  "type": "https://api.shop.com/errors/out-of-stock",
+  "title": "Out of stock",
+  "status": 409,
+  "detail": "Product 42 has only 1 unit left",
+  "instance": "/api/v1/orders",
+  "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"
+}</code></pre>
+<pre><code class="language-java">@RestControllerAdvice
+class ApiErrors extends ResponseEntityExceptionHandler {   // handles standard MVC exceptions as ProblemDetail
+    @ExceptionHandler(OutOfStockException.class)
+    ProblemDetail onOutOfStock(OutOfStockException ex) {
+        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        pd.setTitle("Out of stock");
+        pd.setType(URI.create("https://api.shop.com/errors/out-of-stock"));
+        return pd;
+    }
+}</code></pre>
+<p>Include a stable error <code>type</code> or code that clients can switch on, a correlation/trace id for support, and never expose stack traces or SQL.</p>
+</blockquote>
+<p class="q" id="R7"><strong><span class="qid">R7</span> How do you support HTTP caching with ETag and conditional requests? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Let clients and proxies avoid re-downloading unchanged data. The server sends an <code>ETag</code> validator; the client replays it with <code>If-None-Match</code>, and the server answers <code>304 Not Modified</code> with no body.</p>
+<pre><code class="language-java">@GetMapping("/{id}")
+ResponseEntity&lt;BookDto&gt; get(@PathVariable Long id) {
+    BookDto book = service.get(id);
+    return ResponseEntity.ok()
+        .eTag("\"" + book.version() + "\"")                        // use the entity @Version
+        .cacheControl(CacheControl.maxAge(Duration.ofMinutes(5)).cachePublic())
+        .body(book);
+}</code></pre>
+<p>Simpler for whole responses: register <code>ShallowEtagHeaderFilter</code>, which hashes the body (saves bandwidth, not server work). Use <code>If-Match</code> with the version on <code>PUT</code> as an <strong>optimistic concurrency</strong> guard: reject with <code>412 Precondition Failed</code> if the resource changed since the client read it.</p>
+</blockquote>
+<h2 id="experienced">Experienced</h2>
+<p class="q" id="R8"><strong><span class="qid">R8</span> A client retries a payment POST after a timeout and the customer is charged twice. How do you make POST safe to retry? <span class="tag t-scenario">Scenario</span></strong></p>
+<blockquote>
+<p><code>POST</code> is not idempotent, and a timeout leaves the client unsure whether the server processed the request. Use an <strong>idempotency key</strong>: the client generates a unique key per logical operation and sends it in a header; the server stores the first result and returns the same response for any repeat.</p>
+<pre class="mermaid">sequenceDiagram
+  participant C as Client
+  participant API as Payments API
+  participant DB as Idempotency store
+  C-&gt;&gt;API: POST /payments (Idempotency-Key K1)
+  API-&gt;&gt;DB: insert K1 as IN_PROGRESS (unique constraint)
+  API-&gt;&gt;API: charge card
+  API-&gt;&gt;DB: save response for K1
+  API--xC: timeout, response lost
+  C-&gt;&gt;API: retry POST /payments (K1)
+  API-&gt;&gt;DB: K1 already COMPLETED
+  DB--&gt;&gt;API: stored response
+  API--&gt;&gt;C: same 201 response, no second charge</pre>
+<pre><code class="language-java">@PostMapping("/payments")
+ResponseEntity&lt;PaymentDto&gt; pay(@RequestHeader("Idempotency-Key") String key,
+                               @Valid @RequestBody PaymentRequest req) {
+    return idempotency.execute(key, req, () -&gt; paymentService.charge(req));
+}
+// idempotency.execute: insert key row (unique), run once, store result;
+// if the key exists: return the stored result, or 409 if still IN_PROGRESS;
+// if the same key arrives with a different body: reject with 422.</code></pre>
+<p>Details that matter: a <strong>unique database constraint</strong> on the key to win the race between concurrent duplicates, a key expiry (24 to 48 hours), storing a hash of the request to detect misuse, and idempotent downstream calls (pass the key to the payment provider too).</p>
+</blockquote>
+<p class="q" id="R9"><strong><span class="qid">R9</span> Design a public REST API with rate limiting and quotas for thousands of API consumers. <span class="tag t-design">Design</span></strong></p>
+<blockquote>
+<pre class="mermaid">flowchart LR
+  C["API consumers"] --&gt; G["API gateway&lt;br/&gt;TLS, auth, rate limit, quotas"]
+  G --&gt; R[("Redis&lt;br/&gt;token buckets")]
+  G --&gt; S1["Orders service"]
+  G --&gt; S2["Catalog service"]
+  S1 --&gt; DB1[("DB")]
+  S2 --&gt; DB2[("DB")]
+  G --&gt; M["Metrics and logs"]</pre>
+<ul><li><strong>Enforce at the edge</strong>: API gateway (Spring Cloud Gateway, Kong, AWS API Gateway) so abusive traffic never reaches services.</li><li><strong>Algorithm</strong>: token bucket per API key (smooth bursts, steady refill) stored in <strong>Redis</strong> so limits are shared across gateway instances. Spring Cloud Gateway has a <code>RequestRateLimiter</code> filter backed by Redis.</li><li><strong>Contract</strong>: return <code>429 Too Many Requests</code> with <code>Retry-After</code>, and expose <code>X-RateLimit-Limit</code>, <code>-Remaining</code>, <code>-Reset</code> headers.</li><li><strong>Tiers</strong>: different limits per plan; separate short-term rate limits from monthly quotas.</li><li><strong>Protect services too</strong>: timeouts, bulkheads, load shedding, and idempotency for retried writes.</li><li><strong>Operability</strong>: per-consumer metrics, API keys with rotation, OpenAPI documentation (springdoc), versioning and deprecation policy.</li></ul>
+</blockquote>
+<p class="q" id="R10"><strong><span class="qid">R10</span> How should a Spring service call other REST APIs: RestTemplate, RestClient, WebClient or declarative HTTP interfaces? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<ul><li><code>RestTemplate</code>: the legacy blocking client, in maintenance mode.</li><li><strong><code>RestClient</code></strong> (Spring 6.1): the modern <strong>blocking</strong> fluent client; use it in MVC apps.</li><li><code>WebClient</code>: reactive and non-blocking; use it in WebFlux apps (or when you need streaming).</li><li><strong>HTTP interface clients</strong> (Spring 6): declare an interface, Spring generates the implementation on top of <code>RestClient</code>/<code>WebClient</code>.</li></ul>
+<pre><code class="language-java">@HttpExchange("/prices")
+interface PriceClient {
+    @GetExchange("/{sku}")
+    Price get(@PathVariable String sku);
+}
+
+@Configuration
+class ClientConfig {
+    @Bean
+    PriceClient priceClient(RestClient.Builder builder) {
+        RestClient rc = builder.baseUrl("https://pricing.internal")
+            .requestFactory(new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build()))
+            .build();
+        return HttpServiceProxyFactory.builderFor(RestClientAdapter.create(rc)).build()
+                                      .createClient(PriceClient.class);
+    }
+}</code></pre>
+<p>Whatever you choose: set <strong>connect and read timeouts</strong>, reuse a pooled client, propagate trace headers, and wrap calls with a retry and circuit breaker.</p>
+</blockquote>
+<footer class="foot">Answers target Spring Framework 6 and Spring Boot 3 (Java 17+). Verify version-specific details against the official reference documentation before an interview.</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="../../assets/script.js"></script>
+<script src="../../assets/qa.js"></script>
+</body>
+</html>

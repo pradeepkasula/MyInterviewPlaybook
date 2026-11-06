@@ -3,17 +3,56 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Spring | My Interview Playbook</title>
-<meta name="description" content="Spring interview track. Coming soon.">
+<title>Spring Interview Questions | My Interview Playbook</title>
+<meta name="description" content="Spring Framework interview questions from beginner to experienced: theory, coding and scenario questions with architecture diagrams.">
 <link rel="stylesheet" href="../assets/landing.css">
 </head>
 <body>
-<main class="wrap narrow">
-  <a class="back" href="../">&larr; All tracks</a>
-  <span class="badge soon">Coming soon</span>
+<header class="top"><div class="wrap">
+  <a class="back light" href="../">&larr; All tracks</a>
+  <p class="eyebrow">Interview track</p>
   <h1>Spring</h1>
-  <p class="lead">Spring Core, IoC and DI, AOP, MVC, Data JPA and Security.</p>
-  <p class="muted">This track is being prepared. It will follow the same layout as the <a href="../systemdesign/">System Design guide</a>: a table of what to know, interview questions and scenarios with model answers.</p>
+  <p class="sub">Spring Framework interview questions from beginner to experienced: theory, coding and scenario questions with architecture diagrams. 75 questions across 7 topics.</p>
+</div></header>
+<main class="wrap">
+  <h2 class="section-title">Topics</h2>
+  <ul class="grid">
+    <li><a class="card" href="core/">
+      <div class="thumb g-spring"><span class="mono">IoC</span></div>
+      <div class="body"><span class="badge">12 questions</span><h3>Spring Core</h3><p>IoC container, dependency injection, bean scopes and lifecycle, circular dependencies and configuration.</p><p class="lv">4 beginner &middot; 4 intermediate &middot; 4 experienced</p></div>
+    </a></li>
+
+    <li><a class="card" href="aop/">
+      <div class="thumb g-spring"><span class="mono">AOP</span></div>
+      <div class="body"><span class="badge">11 questions</span><h3>Spring AOP</h3><p>Aspects, advice and pointcuts, proxies, self-invocation, ordering and real use cases like auditing and retries.</p><p class="lv">3 beginner &middot; 3 intermediate &middot; 5 experienced</p></div>
+    </a></li>
+
+    <li><a class="card" href="web/">
+      <div class="thumb g-spring"><span class="mono">MVC</span></div>
+      <div class="body"><span class="badge">10 questions</span><h3>Spring Web MVC</h3><p>DispatcherServlet request flow, controllers, binding and validation, exception handling, filters vs interceptors and async processing.</p><p class="lv">3 beginner &middot; 4 intermediate &middot; 3 experienced</p></div>
+    </a></li>
+
+    <li><a class="card" href="webflux/">
+      <div class="thumb g-spring"><span class="mono">Rx</span></div>
+      <div class="body"><span class="badge">10 questions</span><h3>Spring WebFlux</h3><p>Reactive streams, Mono and Flux, backpressure, schedulers, WebClient, error handling and when to choose WebFlux over MVC.</p><p class="lv">3 beginner &middot; 3 intermediate &middot; 4 experienced</p></div>
+    </a></li>
+
+    <li><a class="card" href="orm/">
+      <div class="thumb g-spring"><span class="mono">ORM</span></div>
+      <div class="body"><span class="badge">11 questions</span><h3>Spring ORM and Data JPA</h3><p>JPA, Hibernate and Spring Data, lazy loading, N+1, transactions, locking, batching and read-replica routing.</p><p class="lv">3 beginner &middot; 4 intermediate &middot; 4 experienced</p></div>
+    </a></li>
+
+    <li><a class="card" href="rest/">
+      <div class="thumb g-spring"><span class="mono">REST</span></div>
+      <div class="body"><span class="badge">10 questions</span><h3>Spring REST API Design</h3><p>REST principles, status codes, versioning, pagination, error format, idempotency, caching and designing a rate-limited public API.</p><p class="lv">3 beginner &middot; 4 intermediate &middot; 3 experienced</p></div>
+    </a></li>
+
+    <li><a class="card" href="security/">
+      <div class="thumb g-spring"><span class="mono">Sec</span></div>
+      <div class="body"><span class="badge">11 questions</span><h3>Spring Security</h3><p>Filter chain, authentication flow, password storage, method security, CSRF and CORS, JWT, OAuth2 and securing microservices.</p><p class="lv">3 beginner &middot; 4 intermediate &middot; 4 experienced</p></div>
+    </a></li>
+  </ul>
 </main>
+<footer class="foot">Prepared by Pradeep Kasula &middot; <a href="https://pradeepkasula.github.io/">Portfolio</a></footer>
 </body>
 </html>

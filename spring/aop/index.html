@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring AOP Interview Questions | My Interview Playbook</title>
+<meta name="description" content="Aspects, advice and pointcuts, proxies, self-invocation, ordering and real use cases like auditing and retries.">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/qa.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+<button class="menu-btn" id="menuBtn" aria-label="Toggle contents" aria-expanded="false">Contents</button>
+<aside class="sidebar" id="sidebar">
+  <a class="back" href="../">&larr; Spring track</a>
+  <p class="side-title">On this page</p>
+  <nav>
+<a href="#top-of-page">Overview</a>
+<a href="#beginner">Beginner <span class="cnt">3</span></a>
+<a href="#intermediate">Intermediate <span class="cnt">3</span></a>
+<a href="#experienced">Experienced <span class="cnt">5</span></a>
+  </nav>
+  <p class="side-title" style="margin-top:20px">Spring topics</p>
+  <nav class="topics">
+<a href="../core/">Spring Core</a>
+<a href="../aop/" class="here">Spring AOP</a>
+<a href="../web/">Spring Web MVC</a>
+<a href="../webflux/">Spring WebFlux</a>
+<a href="../orm/">Spring ORM and Data JPA</a>
+<a href="../rest/">Spring REST API Design</a>
+<a href="../security/">Spring Security</a>
+  </nav>
+  <label class="practice"><input type="checkbox" id="practice"> Practice mode<span>Hide answers. Click a question to reveal its answer.</span></label>
+</aside>
+<main class="content">
+<header class="hero" id="top-of-page"><p class="eyebrow">Spring interview playbook</p><h1 class="doc-title">Spring AOP</h1><p class="subtitle">Aspects, advice and pointcuts, proxies, self-invocation, ordering and real use cases like auditing and retries.</p><p class="intro">11 questions: Beginner 3 &middot; Intermediate 3 &middot; Experienced 5. Each question is tagged <span class="tag t-theory">Theory</span> <span class="tag t-coding">Coding</span> <span class="tag t-scenario">Scenario</span> <span class="tag t-design">Design</span>. Use Practice mode to hide the answers and test yourself.</p></header>
+<h2 id="beginner">Beginner</h2>
+<p class="q" id="A1"><strong><span class="qid">A1</span> What is AOP and why do we need it? Explain aspect, join point, pointcut, advice and weaving. <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>Aspect-Oriented Programming separates <strong>cross-cutting concerns</strong> (logging, security, transactions, metrics, caching) from business logic, so they are written once and applied declaratively instead of being copied into every method.</p>
+<ul><li><strong>Aspect:</strong> a class that packages a cross-cutting concern (<code>@Aspect</code>).</li><li><strong>Join point:</strong> a point in execution where an aspect can apply. In Spring AOP it is always a <strong>method execution</strong> on a Spring bean.</li><li><strong>Pointcut:</strong> an expression that selects which join points to match.</li><li><strong>Advice:</strong> the code that runs at the matched join point (before, after, around...).</li><li><strong>Weaving:</strong> linking aspects with target objects. Spring AOP weaves at <strong>runtime</strong> using proxies.</li><li><strong>Target:</strong> the original bean being advised. <strong>Proxy:</strong> the object Spring puts in front of it.</li></ul>
+<pre class="mermaid">flowchart LR
+  Caller["Caller"] --&gt; Proxy["Proxy&lt;br/&gt;(created by Spring)"]
+  Proxy --&gt; A1["Advice: before"]
+  A1 --&gt; Target["Target bean method"]
+  Target --&gt; A2["Advice: after / afterReturning"]
+  A2 --&gt; Caller</pre>
+</blockquote>
+<p class="q" id="A2"><strong><span class="qid">A2</span> What are the types of advice in Spring AOP? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<ul><li><code>@Before</code>: runs before the method. Cannot stop it, except by throwing an exception.</li><li><code>@AfterReturning</code>: runs after normal return; can read the return value.</li><li><code>@AfterThrowing</code>: runs when the method throws; can read the exception.</li><li><code>@After</code> (finally): runs after the method however it ends.</li><li><code>@Around</code>: wraps the call. It receives a <code>ProceedingJoinPoint</code>, decides whether and when to call <code>proceed()</code>, and can change arguments or the result. It is the most powerful and what <code>@Transactional</code>, <code>@Cacheable</code> and retry logic use.</li></ul>
+<p>Prefer the <strong>least powerful</strong> advice that does the job: an <code>@Before</code> check is harder to get wrong than an <code>@Around</code> that forgets to call <code>proceed()</code>.</p>
+</blockquote>
+<p class="q" id="A3"><strong><span class="qid">A3</span> Write an aspect that logs the execution time of every public method in the service package. <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<pre><code class="language-java">@Aspect
+@Component
+public class TimingAspect {
+    private static final Logger log = LoggerFactory.getLogger(TimingAspect.class);
+
+    @Around("execution(public * com.shop.service..*(..))")
+    public Object time(ProceedingJoinPoint pjp) throws Throwable {
+        long start = System.nanoTime();
+        try {
+            return pjp.proceed();                       // call the real method
+        } finally {
+            long ms = (System.nanoTime() - start) / 1_000_000;
+            log.info("{} took {} ms", pjp.getSignature().toShortString(), ms);
+        }
+    }
+}</code></pre>
+<p>Reading the pointcut: <code>execution(modifiers? return-type declaring-type? method(args) throws?)</code>. Here: any public method, any return type, in <code>com.shop.service</code> and its sub-packages (<code>..</code>), any arguments. Always rethrow exceptions (<code>throws Throwable</code>) so you do not swallow them. In Spring Boot, <code>spring-boot-starter-aop</code> supplies AspectJ's annotations and enables proxying automatically.</p>
+</blockquote>
+<h2 id="intermediate">Intermediate</h2>
+<p class="q" id="A4"><strong><span class="qid">A4</span> How does Spring AOP work internally? JDK dynamic proxy vs CGLIB. <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>At startup an auto-proxy creator (a <code>BeanPostProcessor</code>) checks each bean against all pointcuts. If any advice matches, it replaces the bean with a <strong>proxy</strong> that runs the advice chain and then delegates to the target.</p>
+<div class="table-wrap"><table><thead><tr><th></th><th>JDK dynamic proxy</th><th>CGLIB proxy</th></tr></thead><tbody><tr><td>Mechanism</td><td>Implements the bean's interfaces</td><td>Generates a <strong>subclass</strong> of the bean</td></tr><tr><td>Needs</td><td>At least one interface</td><td>A non-final class and non-final methods</td></tr><tr><td>Injection by</td><td>Interface type only</td><td>Interface or class type</td></tr></tbody></table></div>
+<p>Spring Boot sets <code>spring.aop.proxy-target-class=true</code> by default, so <strong>CGLIB is used even for beans with interfaces</strong>. This avoids <code>ClassCastException</code> when something injects the concrete class.</p>
+</blockquote>
+<p class="q" id="A5"><strong><span class="qid">A5</span> What is the difference between Spring AOP and AspectJ? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<div class="table-wrap"><table><thead><tr><th></th><th>Spring AOP</th><th>AspectJ</th></tr></thead><tbody><tr><td>Weaving</td><td>Runtime, proxy-based</td><td>Compile-time, post-compile or load-time bytecode weaving</td></tr><tr><td>Join points</td><td>Method execution on Spring beans only</td><td>Methods, constructors, field access, static init, any object</td></tr><tr><td>Setup</td><td>Simple, no special compiler</td><td>Needs the AspectJ compiler or a weaving agent</td></tr><tr><td>Performance</td><td>Small proxy overhead per call</td><td>Faster at runtime, no proxy</td></tr><tr><td>Limits</td><td>Self-invocation, final/private methods not advised</td><td>Few limits</td></tr></tbody></table></div>
+<p>Use Spring AOP for the common 90% (transactions, security, logging on beans). Choose AspectJ when you must advise non-Spring objects, constructors, field access or avoid the self-invocation problem.</p>
+</blockquote>
+<p class="q" id="A6"><strong><span class="qid">A6</span> How do you create a custom annotation and an aspect that reacts to it? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Annotation-driven pointcuts are clearer and safer than package-based ones. Example: audit every method marked <code>@Audited</code>.</p>
+<pre><code class="language-java">@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface Audited {
+    String action();
+}
+
+@Aspect
+@Component
+class AuditAspect {
+    private final AuditLog auditLog;
+    AuditAspect(AuditLog auditLog) { this.auditLog = auditLog; }
+
+    @Around("@annotation(audited)")                    // binds the annotation instance
+    Object audit(ProceedingJoinPoint pjp, Audited audited) throws Throwable {
+        String user = SecurityContextHolder.getContext().getAuthentication().getName();
+        try {
+            Object result = pjp.proceed();
+            auditLog.record(user, audited.action(), "SUCCESS");
+            return result;
+        } catch (Throwable ex) {
+            auditLog.record(user, audited.action(), "FAILED: " + ex.getMessage());
+            throw ex;                                  // never swallow
+        }
+    }
+}
+
+@Service
+class AccountService {
+    @Audited(action = "CLOSE_ACCOUNT")
+    public void close(Long id) { /* ... */ }
+}</code></pre>
+</blockquote>
+<h2 id="experienced">Experienced</h2>
+<p class="q" id="A7"><strong><span class="qid">A7</span> My @Transactional (or @Async, @Cacheable) method is ignored when called from another method in the same class. Why, and how do you fix it? <span class="tag t-scenario">Scenario</span></strong></p>
+<blockquote>
+<p>This is the <strong>self-invocation problem</strong>. Advice lives in the proxy. A call from outside goes through the proxy, but a call from one method to another on <code>this</code> goes straight to the target object and bypasses the proxy entirely.</p>
+<pre class="mermaid">sequenceDiagram
+  participant C as Client
+  participant P as Proxy
+  participant T as Target (OrderService)
+  C-&gt;&gt;P: placeOrder()
+  P-&gt;&gt;T: placeOrder() with advice
+  T-&gt;&gt;T: this.sendEmail()  (@Async ignored)
+  Note over T: Direct call on this, the proxy is bypassed</pre>
+<p>Fixes, in order of preference:</p>
+<ol><li><strong>Move the method to another bean</strong> and inject it. The call then crosses a proxy. This is the cleanest design.</li><li>Inject the bean's own proxy (<code>@Lazy</code> self-injection) and call through it. Works but is awkward.</li><li>Use AspectJ mode (<code>@EnableTransactionManagement(mode = AdviceMode.ASPECTJ)</code>) so weaving changes the bytecode itself.</li></ol>
+<p>Related limits: <code>private</code>, <code>final</code> and <code>static</code> methods are not advised by CGLIB proxies. Before Spring 6, <code>@Transactional</code> was also ignored on <code>protected</code> and package-private methods; with class-based proxies Spring 6 supports them, but <code>private</code> methods are still never advised.</p>
+</blockquote>
+<p class="q" id="A8"><strong><span class="qid">A8</span> Multiple aspects apply to the same method. How is the order decided, and how do exceptions flow through @Around advice? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>Order is controlled by <code>@Order(n)</code> on the aspect class (or implementing <code>Ordered</code>). <strong>Lower value = higher precedence</strong>: its "before" part runs first and its "after" part runs last, like nested onions.</p>
+<pre class="mermaid">flowchart LR
+  R["Request"] --&gt; S["SecurityAspect&lt;br/&gt;@Order(1)"]
+  S --&gt; T["TransactionAspect&lt;br/&gt;@Order(2)"]
+  T --&gt; L["LoggingAspect&lt;br/&gt;@Order(3)"]
+  L --&gt; M["Target method"]</pre>
+<p>Practical consequences:</p>
+<ul><li>Put security outermost so an unauthorized call never opens a transaction.</li><li>Put retry <strong>outside</strong> the transaction advice, otherwise a retry reuses a transaction already marked rollback-only.</li><li>Without <code>@Order</code>, the order is undefined, so never rely on it.</li><li>An exception travels back outward through each <code>@Around</code>. If an advice catches it and returns normally, the outer advice (and the caller) see success. This is how <code>@Transactional</code> ends up not rolling back when an inner aspect swallows the exception.</li></ul>
+</blockquote>
+<p class="q" id="A9"><strong><span class="qid">A9</span> Implement a retry mechanism with an annotation, and explain what you must watch for. <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<pre><code class="language-java">@Target(ElementType.METHOD) @Retention(RetentionPolicy.RUNTIME)
+public @interface Retry { int attempts() default 3; long backoffMs() default 200; }
+
+@Aspect @Component @Order(Ordered.HIGHEST_PRECEDENCE)   // outside @Transactional
+class RetryAspect {
+    @Around("@annotation(retry)")
+    Object around(ProceedingJoinPoint pjp, Retry retry) throws Throwable {
+        Throwable last = null;
+        for (int i = 1; i &lt;= retry.attempts(); i++) {
+            try {
+                return pjp.proceed();
+            } catch (TransientDataAccessException | SocketTimeoutException ex) { // retry only transient errors
+                last = ex;
+                Thread.sleep(retry.backoffMs() * i);                              // linear backoff
+            }
+        }
+        throw last;
+    }
+}</code></pre>
+<p>Watch for: retrying only <strong>idempotent</strong> operations or transient failures; adding jitter and a cap to avoid retry storms; keeping the aspect outside the transaction; and not retrying validation or business exceptions. In production prefer <strong>Spring Retry</strong> (<code>@Retryable</code>) or Resilience4j, which implement these concerns, plus circuit breakers.</p>
+</blockquote>
+<p class="q" id="A10"><strong><span class="qid">A10</span> How is @Transactional implemented with AOP? What happens on an exception? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p><code>@Transactional</code> is handled by <code>TransactionInterceptor</code>, an <code>@Around</code>-style advice installed on a proxy.</p>
+<pre class="mermaid">sequenceDiagram
+  participant C as Client
+  participant P as Proxy (TransactionInterceptor)
+  participant M as PlatformTransactionManager
+  participant T as Target
+  C-&gt;&gt;P: transfer()
+  P-&gt;&gt;M: begin (get connection, setAutoCommit false)
+  P-&gt;&gt;T: transfer()
+  alt returns normally
+    T--&gt;&gt;P: result
+    P-&gt;&gt;M: commit
+  else throws RuntimeException or Error
+    T--&gt;&gt;P: exception
+    P-&gt;&gt;M: rollback
+  end
+  P--&gt;&gt;C: result or exception</pre>
+<p>Default rollback rule: <strong>rollback on unchecked exceptions (<code>RuntimeException</code>, <code>Error</code>) only</strong>. A checked exception commits unless you declare <code>@Transactional(rollbackFor = Exception.class)</code>. Because it is proxy-based, self-invocation, non-public methods and swallowed exceptions all defeat it (see the self-invocation question).</p>
+</blockquote>
+<p class="q" id="A11"><strong><span class="qid">A11</span> Design a cross-cutting solution for API rate limiting and request auditing across 40 microservices without copying code. <span class="tag t-design">Design</span></strong></p>
+<blockquote>
+<p>Put the cross-cutting concern in a <strong>shared library</strong> and apply it declaratively.</p>
+<ul><li>A starter module <code>platform-audit-starter</code> contains the <code>@Audited</code> annotation, the aspect and an auto-configuration registered in <code>META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports</code>. Services only add the dependency.</li><li>Make aspects conditional (<code>@ConditionalOnProperty</code>) so teams can disable them per environment.</li><li>Keep aspects thin and <strong>non-blocking</strong>: write audit events to an async queue/Kafka topic instead of the database inside the request path.</li><li>For rate limiting that must be consistent across instances, do not use an in-memory aspect alone. Enforce it at the <strong>API gateway</strong> or use a shared store (Redis token bucket). An aspect is fine for per-instance protection of an expensive method.</li></ul>
+<p>Trade-off to state in an interview: AOP is great for uniform, orthogonal behavior, but hides control flow. Keep aspects small, well-named and covered by tests (use <code>@SpringBootTest</code> or a slice with <code>@EnableAspectJAutoProxy</code>), and prefer explicit code when the behavior is business logic.</p>
+</blockquote>
+<footer class="foot">Answers target Spring Framework 6 and Spring Boot 3 (Java 17+). Verify version-specific details against the official reference documentation before an interview.</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="../../assets/script.js"></script>
+<script src="../../assets/qa.js"></script>
+</body>
+</html>

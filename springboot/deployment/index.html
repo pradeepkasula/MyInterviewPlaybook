@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deployment and Performance Interview Questions | My Interview Playbook</title>
+<meta name="description" content="Executable jars, Docker images, graceful shutdown, Kubernetes, JVM tuning, virtual threads, native images and load-test scenarios.">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/qa.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+<button class="menu-btn" id="menuBtn" aria-label="Toggle contents" aria-expanded="false">Contents</button>
+<aside class="sidebar" id="sidebar">
+  <a class="back" href="../">&larr; Spring Boot track</a>
+  <p class="side-title">On this page</p>
+  <nav>
+<a href="#top-of-page">Overview</a>
+<a href="#beginner">Beginner <span class="cnt">3</span></a>
+<a href="#intermediate">Intermediate <span class="cnt">3</span></a>
+<a href="#experienced">Experienced <span class="cnt">3</span></a>
+  </nav>
+  <p class="side-title" style="margin-top:20px">Spring Boot topics</p>
+  <nav class="topics">
+<a href="../fundamentals/">Boot Fundamentals and Auto-configuration</a>
+<a href="../config/">Configuration and Profiles</a>
+<a href="../data/">Data, Caching and Migrations</a>
+<a href="../actuator/">Actuator and Observability</a>
+<a href="../testing/">Testing Spring Boot Applications</a>
+<a href="../microservices/">Microservices with Spring Boot</a>
+<a href="../deployment/" class="here">Deployment and Performance</a>
+  </nav>
+  <label class="practice"><input type="checkbox" id="practice"> Practice mode<span>Hide answers. Click a question to reveal its answer.</span></label>
+</aside>
+<main class="content">
+<header class="hero" id="top-of-page"><p class="eyebrow">Spring Boot interview playbook</p><h1 class="doc-title">Deployment and Performance</h1><p class="subtitle">Executable jars, Docker images, graceful shutdown, Kubernetes, JVM tuning, virtual threads, native images and load-test scenarios.</p><p class="intro">9 questions: Beginner 3 &middot; Intermediate 3 &middot; Experienced 3. Each question is tagged <span class="tag t-theory">Theory</span> <span class="tag t-coding">Coding</span> <span class="tag t-scenario">Scenario</span> <span class="tag t-design">Design</span>. Use Practice mode to hide the answers and test yourself.</p></header>
+<h2 id="beginner">Beginner</h2>
+<p class="q" id="P1"><strong><span class="qid">P1</span> What is a Spring Boot executable jar and how do you run it? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>Boot's build plugin repackages your app into a <strong>fat (executable) jar</strong>: your classes, all dependency jars (under <code>BOOT-INF/lib</code>) and a launcher. Because the web server is embedded, you run it with one command, no application server needed.</p>
+<pre><code class="language-bash">./mvnw clean package            # or ./gradlew bootJar
+java -jar target/shop-1.0.0.jar --spring.profiles.active=prod</code></pre>
+<p>You can still build a <strong>WAR</strong> to deploy into an external servlet container (extend <code>SpringBootServletInitializer</code>), but a jar is the norm for containers and cloud. For local development use <code>spring-boot-devtools</code> (automatic restart) and <code>mvn spring-boot:run</code>.</p>
+</blockquote>
+<p class="q" id="P2"><strong><span class="qid">P2</span> How do you containerize a Spring Boot application well? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Prefer <strong>layered jars</strong> so Docker caches the rarely-changing dependency layer and only rebuilds your small code layer, or let <strong>Cloud Native Buildpacks</strong> do it with no Dockerfile.</p>
+<pre><code class="language-dockerfile"># Multi-stage build with layered jar
+FROM eclipse-temurin:21-jre AS builder
+WORKDIR /app
+COPY target/shop.jar app.jar
+RUN java -Djarmode=tools -jar app.jar extract --layers --destination extracted
+
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+RUN useradd -r -u 1001 appuser                       # do not run as root
+COPY --from=builder /app/extracted/dependencies/ ./
+COPY --from=builder /app/extracted/spring-boot-loader/ ./
+COPY --from=builder /app/extracted/snapshot-dependencies/ ./
+COPY --from=builder /app/extracted/application/ ./
+USER appuser
+EXPOSE 8080
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "app.jar"]</code></pre>
+<pre><code class="language-bash">./mvnw spring-boot:build-image          # buildpacks: no Dockerfile, sensible JVM memory settings</code></pre>
+<p>Good practice: pin base image versions, use a slim JRE image, run as a non-root user, keep secrets out of the image, and scan the image for vulnerabilities in CI.</p>
+</blockquote>
+<p class="q" id="P3"><strong><span class="qid">P3</span> What is graceful shutdown and why does it matter? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>When a pod is stopped or redeployed, in-flight requests should finish instead of being cut off. Enable it and give it a timeout:</p>
+<pre><code class="language-properties">server.shutdown=graceful
+spring.lifecycle.timeout-per-shutdown-phase=30s</code></pre>
+<p>On <code>SIGTERM</code> Boot stops accepting new requests, readiness goes <strong>out of service</strong> so the load balancer stops sending traffic, and active requests are allowed to complete until the timeout. Kubernetes needs <code>terminationGracePeriodSeconds</code> larger than that timeout, and many teams add a short <code>preStop</code> sleep so endpoint removal propagates before shutdown starts. Also close consumers cleanly (Kafka listeners stop and commit offsets) to avoid reprocessing.</p>
+</blockquote>
+<h2 id="intermediate">Intermediate</h2>
+<p class="q" id="P4"><strong><span class="qid">P4</span> How do you configure JVM memory for containers? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>The JVM must respect the container's memory limit; otherwise the OS kills the pod (<code>OOMKilled</code>). Modern JVMs (Java 11+) are container-aware.</p>
+<ul><li>Set heap as a <strong>percentage</strong> of container memory: <code>-XX:MaxRAMPercentage=70</code> to <code>75</code> (leave room for metaspace, thread stacks, direct buffers and native memory). The default of 25% wastes memory.</li><li>Set the <strong>container limit</strong> and request sensibly (for example 1Gi request, 1Gi limit), and CPU requests that match real usage; heavy CPU throttling shows up as latency spikes.</li><li>Pick the collector: <strong>G1</strong> (default) is a good general choice; ZGC or Shenandoah for very low pause needs on larger heaps.</li><li>Tune thread stack size and the number of threads: each platform thread uses memory (about 1 MB of stack by default).</li></ul>
+<pre><code class="language-yaml">resources:
+  requests: { cpu: "500m", memory: "1Gi" }
+  limits:   { memory: "1Gi" }
+env:
+  - name: JAVA_TOOL_OPTIONS
+    value: "-XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError"</code></pre>
+<p><code>ExitOnOutOfMemoryError</code> lets Kubernetes restart the pod instead of leaving a half-dead JVM. Verify with metrics (<code>jvm.memory.used</code>, GC pause time) rather than guessing.</p>
+</blockquote>
+<p class="q" id="P5"><strong><span class="qid">P5</span> What are virtual threads and how do you use them in Spring Boot? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>Virtual threads (Java 21, Project Loom) are <strong>lightweight threads managed by the JVM</strong>. A blocking call (JDBC, HTTP, <code>sleep</code>) <strong>unmounts</strong> the virtual thread from its carrier thread, so thousands of blocked requests do not consume thousands of OS threads. This gives high concurrency with simple blocking code, without rewriting to reactive.</p>
+<pre><code class="language-properties"># Spring Boot 3.2+, Java 21+
+spring.threads.virtual.enabled=true</code></pre>
+<p>Effects: Tomcat/Jetty handle each request on a virtual thread; <code>@Async</code>, <code>@Scheduled</code> and Kafka listeners use virtual-thread executors where configured.</p>
+<pre class="mermaid">flowchart LR
+  subgraph "Platform threads (a few, = CPU cores)"
+    C1["Carrier thread 1"]
+    C2["Carrier thread 2"]
+  end
+  V1["Virtual thread: request 1&lt;br/&gt;blocks on DB"] -. "unmounted while waiting" .-&gt; C1
+  V2["Virtual thread: request 2"] --&gt; C1
+  V3["Virtual thread: request 3"] --&gt; C2
+  V4["...10,000 more virtual threads"] -.-&gt; C2</pre>
+<p>Cautions: <strong>bounded resources still matter</strong> (a 10-connection database pool still limits throughput, so protect it); avoid <strong>pinning</strong> (long <code>synchronized</code> blocks or native calls holding the carrier; prefer <code>ReentrantLock</code>); do not pool virtual threads; and <code>ThreadLocal</code>-heavy code costs memory. It helps I/O-bound workloads, not CPU-bound ones.</p>
+</blockquote>
+<p class="q" id="P6"><strong><span class="qid">P6</span> What is a GraalVM native image, and what are the trade-offs? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>A native image compiles your app <strong>ahead of time</strong> into a standalone executable (using Spring AOT processing plus GraalVM <code>native-image</code>), with no JVM at runtime.</p>
+<ul><li><strong>Pros:</strong> start in tens of milliseconds, much lower memory (RSS), smaller attack surface; ideal for serverless, scale-to-zero and CLI tools.</li><li><strong>Cons:</strong> slow, memory-hungry builds; a <strong>closed-world</strong> assumption, so reflection, proxies, resources and serialization need hints (Spring generates most, libraries may not); fewer runtime diagnostics (no JVMTI agents, limited JFR/heap tools); peak throughput can be lower than a warmed-up JIT.</li></ul>
+<pre><code class="language-bash">./mvnw -Pnative native:compile                 # native executable on the host
+./mvnw -Pnative spring-boot:build-image        # native image in a container via buildpacks</code></pre>
+<p>Decision rule: use native when startup time and memory dominate cost (many small, frequently scaled services); stay on the JVM (possibly with CDS or CRaC) for long-running, throughput-heavy services.</p>
+</blockquote>
+<h2 id="experienced">Experienced</h2>
+<p class="q" id="P7"><strong><span class="qid">P7</span> After a release, p99 latency doubles under load. How do you investigate and fix it? <span class="tag t-scenario">Scenario</span></strong></p>
+<blockquote>
+<pre class="mermaid">flowchart TD
+  A["p99 doubled under load after release"] --&gt; B["Compare: what changed?&lt;br/&gt;code, config, data volume, dependency versions"]
+  B --&gt; C["Reproduce with a load test&lt;br/&gt;(k6 / Gatling) at production-like scale"]
+  C --&gt; D["Observe: RED + saturation metrics, traces of slow requests"]
+  D --&gt; E{"Bottleneck"}
+  E --&gt;|"CPU"| F["Profile with JFR / async-profiler:&lt;br/&gt;hot methods, regex, serialization, logging"]
+  E --&gt;|"Threads waiting"| G["Thread dump: locks, blocking I/O,&lt;br/&gt;pool exhaustion"]
+  E --&gt;|"DB"| H["Slow queries, N+1, missing index,&lt;br/&gt;lock contention, pool size"]
+  E --&gt;|"GC"| I["GC logs: allocation rate, heap size,&lt;br/&gt;object churn"]
+  E --&gt;|"Downstream"| J["Timeouts, circuit breaker, caching"]
+  F --&gt; K["Fix, re-run the same load test, compare"]
+  G --&gt; K
+  H --&gt; K
+  I --&gt; K
+  J --&gt; K</pre>
+<p>Discipline: change <strong>one thing at a time</strong>, keep the load test and environment identical, and compare <strong>percentiles</strong>, not averages. Roll back first if the SLO is burning, then investigate calmly. Typical culprits: a new N+1 query, an unbounded in-memory cache, a synchronous remote call added to the hot path, excessive logging, a missing timeout, a smaller connection pool after a config change, or a JVM flag not honored in the container. Add the check to the CI performance gate afterward so it cannot regress silently.</p>
+</blockquote>
+<p class="q" id="P8"><strong><span class="qid">P8</span> Design a zero-downtime deployment strategy for a stateless Spring Boot service on Kubernetes. <span class="tag t-design">Design</span></strong></p>
+<blockquote>
+<pre class="mermaid">flowchart LR
+  CI["CI pipeline&lt;br/&gt;build, test, image scan, push"] --&gt; REG[("Image registry")]
+  REG --&gt; K["Kubernetes Deployment&lt;br/&gt;rolling update, maxUnavailable 0"]
+  K --&gt; P1["Pod v1 (running)"]
+  K --&gt; P2["Pod v2 (starting)"]
+  P2 -- "readiness passes" --&gt; SVC["Service / ingress&lt;br/&gt;routes traffic"]
+  P1 -- "preStop + graceful shutdown" --&gt; OUT["Removed after in-flight requests finish"]
+  OBS["Metrics and alerts"] -. "auto rollback on SLO breach" .-&gt; K</pre>
+<ul><li><strong>Rolling update</strong> with <code>maxUnavailable: 0</code> and <code>maxSurge: 1</code>: new pods start and become ready before old ones are removed.</li><li><strong>Readiness probe</strong> gates traffic; a <strong>startup probe</strong> protects slow starters; <strong>graceful shutdown</strong> and a <code>preStop</code> sleep drain old pods; <strong>PodDisruptionBudget</strong> keeps capacity during node maintenance.</li><li><strong>Backward-compatible changes only</strong> (database expand and contract, tolerant readers in APIs and events), because old and new versions overlap.</li><li><strong>Progressive delivery:</strong> canary or blue/green with a tool such as Argo Rollouts or a service mesh, shifting 5% then 25% then 100% of traffic while watching error rate and latency, with <strong>automatic rollback</strong>.</li><li><strong>Capacity:</strong> at least 2 replicas across zones (anti-affinity), HPA on CPU or custom metrics (requests per second), resource requests set realistically.</li><li><strong>Config and secrets</strong> come from the environment, so the same image is promoted unchanged from test to production.</li></ul>
+</blockquote>
+<p class="q" id="P9"><strong><span class="qid">P9</span> How do you tune thread pools, connection pools and timeouts so they work together? <span class="tag t-scenario">Scenario</span></strong></p>
+<blockquote>
+<p>Think of the request path as a series of <strong>queues with limits</strong>; the smallest limit decides throughput and the way they fail decides stability.</p>
+<pre class="mermaid">flowchart LR
+  LB["Load balancer&lt;br/&gt;idle timeout 60 s"] --&gt; T["Tomcat threads&lt;br/&gt;max 200"]
+  T --&gt; H["Hikari pool&lt;br/&gt;max 15"]
+  H --&gt; DB[("Database&lt;br/&gt;max_connections 100")]
+  T --&gt; HC["HTTP client pool&lt;br/&gt;max 50 per host,&lt;br/&gt;timeout 2 s"]
+  HC --&gt; X["Downstream service"]</pre>
+<ul><li><strong>Order the timeouts:</strong> client timeout &gt; gateway/LB timeout &gt; service call timeout &gt; database/query timeout. Otherwise upstream gives up while downstream keeps working, wasting capacity.</li><li><strong>Do not let 200 request threads fight for 15 connections</strong> without a plan: queued threads wait up to <code>connectionTimeout</code>, so keep that short (a few seconds) to fail fast instead of piling up.</li><li><strong>Total connections:</strong> <code>replicas x pool size</code> must stay under the database <code>max_connections</code> (with headroom for admin and migrations).</li><li><strong>Bulkhead</strong> per downstream so one slow dependency cannot take all threads; <strong>timeouts and circuit breakers</strong> on every outbound call.</li><li><strong>Load shedding:</strong> when saturated, reject early (<code>503</code> / <code>429</code>) rather than queueing until everything times out.</li><li>Validate with a <strong>load test that includes a slow dependency</strong> (inject latency) and watch queue depths: <code>tomcat.threads.busy</code>, <code>hikaricp.connections.pending</code>, circuit breaker state.</li></ul>
+</blockquote>
+<footer class="foot">Answers target Spring Framework 6 and Spring Boot 3 (Java 17+). Verify version-specific details against the official reference documentation before an interview.</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="../../assets/script.js"></script>
+<script src="../../assets/qa.js"></script>
+</body>
+</html>

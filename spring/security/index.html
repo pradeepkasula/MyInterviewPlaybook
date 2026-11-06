@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring Security Interview Questions | My Interview Playbook</title>
+<meta name="description" content="Filter chain, authentication flow, password storage, method security, CSRF and CORS, JWT, OAuth2 and securing microservices.">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/qa.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+<button class="menu-btn" id="menuBtn" aria-label="Toggle contents" aria-expanded="false">Contents</button>
+<aside class="sidebar" id="sidebar">
+  <a class="back" href="../">&larr; Spring track</a>
+  <p class="side-title">On this page</p>
+  <nav>
+<a href="#top-of-page">Overview</a>
+<a href="#beginner">Beginner <span class="cnt">3</span></a>
+<a href="#intermediate">Intermediate <span class="cnt">4</span></a>
+<a href="#experienced">Experienced <span class="cnt">4</span></a>
+  </nav>
+  <p class="side-title" style="margin-top:20px">Spring topics</p>
+  <nav class="topics">
+<a href="../core/">Spring Core</a>
+<a href="../aop/">Spring AOP</a>
+<a href="../web/">Spring Web MVC</a>
+<a href="../webflux/">Spring WebFlux</a>
+<a href="../orm/">Spring ORM and Data JPA</a>
+<a href="../rest/">Spring REST API Design</a>
+<a href="../security/" class="here">Spring Security</a>
+  </nav>
+  <label class="practice"><input type="checkbox" id="practice"> Practice mode<span>Hide answers. Click a question to reveal its answer.</span></label>
+</aside>
+<main class="content">
+<header class="hero" id="top-of-page"><p class="eyebrow">Spring interview playbook</p><h1 class="doc-title">Spring Security</h1><p class="subtitle">Filter chain, authentication flow, password storage, method security, CSRF and CORS, JWT, OAuth2 and securing microservices.</p><p class="intro">11 questions: Beginner 3 &middot; Intermediate 4 &middot; Experienced 4. Each question is tagged <span class="tag t-theory">Theory</span> <span class="tag t-coding">Coding</span> <span class="tag t-scenario">Scenario</span> <span class="tag t-design">Design</span>. Use Practice mode to hide the answers and test yourself.</p></header>
+<h2 id="beginner">Beginner</h2>
+<p class="q" id="S1"><strong><span class="qid">S1</span> What is the difference between authentication and authorization, and how does Spring Security fit into a request? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<ul><li><strong>Authentication:</strong> proving <em>who you are</em> (username/password, token, certificate).</li><li><strong>Authorization:</strong> deciding <em>what you may do</em> (roles, authorities, permissions).</li></ul>
+<p>Spring Security is built on a <strong>chain of servlet filters</strong> that sits in front of <code>DispatcherServlet</code>. Each filter has one job (CORS, CSRF, authentication, session handling, authorization). Requests that fail are rejected before reaching your controller.</p>
+<pre class="mermaid">flowchart LR
+  R["HTTP request"] --&gt; F1["CorsFilter"]
+  F1 --&gt; F2["CsrfFilter"]
+  F2 --&gt; F3["Authentication filter&lt;br/&gt;(basic, form, bearer token)"]
+  F3 --&gt; F4["AuthorizationFilter&lt;br/&gt;(URL rules)"]
+  F4 --&gt; D["DispatcherServlet&lt;br/&gt;Controller"]
+  F3 -. "stores Authentication" .-&gt; SC[("SecurityContext")]
+  F4 -. "reads Authentication" .-&gt; SC</pre>
+<p>The result of authentication is an <code>Authentication</code> object (principal, credentials, authorities) held in the <code>SecurityContext</code>, available through <code>SecurityContextHolder</code> for the current request.</p>
+</blockquote>
+<p class="q" id="S2"><strong><span class="qid">S2</span> How do you configure Spring Security in Spring Boot 3 (no WebSecurityConfigurerAdapter)? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p><code>WebSecurityConfigurerAdapter</code> was removed in Spring Security 6. Declare a <code>SecurityFilterChain</code> bean using the lambda DSL.</p>
+<pre><code class="language-java">@Configuration
+@EnableWebSecurity
+class SecurityConfig {
+
+    @Bean
+    SecurityFilterChain api(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -&gt; csrf.disable())                         // stateless token API; see the CSRF question
+            .sessionManagement(s -&gt; s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -&gt; auth
+                .requestMatchers("/actuator/health", "/api/public/**").permitAll()
+                .requestMatchers(HttpMethod.DELETE, "/api/**").hasRole("ADMIN")
+                .requestMatchers("/api/**").authenticated()
+                .anyRequest().denyAll())                          // deny by default
+            .httpBasic(Customizer.withDefaults());
+        return http.build();
+    }
+
+    @Bean
+    PasswordEncoder passwordEncoder() { return PasswordEncoderFactories.createDelegatingPasswordEncoder(); }
+}</code></pre>
+<p>Rules are evaluated <strong>top to bottom, first match wins</strong>, so put specific rules before general ones. End with <code>anyRequest().denyAll()</code> or <code>authenticated()</code> so nothing is accidentally open.</p>
+</blockquote>
+<p class="q" id="S3"><strong><span class="qid">S3</span> How should passwords be stored? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>Never store plain text or fast hashes (MD5, SHA-1, plain SHA-256). Store a <strong>salted, deliberately slow, adaptive hash</strong>: <code>BCryptPasswordEncoder</code>, Argon2 (<code>Argon2PasswordEncoder</code>), SCrypt or PBKDF2. The salt is generated per password and stored inside the hash string, so identical passwords hash differently.</p>
+<p><code>DelegatingPasswordEncoder</code> (the default from <code>PasswordEncoderFactories.createDelegatingPasswordEncoder()</code>) stores the algorithm as a prefix like <code>{bcrypt}$2a$10$...</code>, which lets you <strong>upgrade algorithms over time</strong>: old hashes still verify, and you re-encode on the next successful login (<code>UserDetailsPasswordService</code>). Hashing is one-way: you can compare but never recover a password, and password reset must issue a new one.</p>
+</blockquote>
+<h2 id="intermediate">Intermediate</h2>
+<p class="q" id="S4"><strong><span class="qid">S4</span> Explain the authentication flow with UserDetailsService, AuthenticationManager and AuthenticationProvider. <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<pre class="mermaid">sequenceDiagram
+  participant F as Auth filter
+  participant AM as AuthenticationManager (ProviderManager)
+  participant AP as DaoAuthenticationProvider
+  participant US as UserDetailsService
+  participant PE as PasswordEncoder
+  participant SC as SecurityContext
+  F-&gt;&gt;AM: authenticate(UsernamePasswordAuthenticationToken)
+  AM-&gt;&gt;AP: supports this token type?
+  AP-&gt;&gt;US: loadUserByUsername(name)
+  US--&gt;&gt;AP: UserDetails (hash + authorities)
+  AP-&gt;&gt;PE: matches(raw password, stored hash)
+  PE--&gt;&gt;AP: true
+  AP--&gt;&gt;AM: authenticated Authentication
+  AM--&gt;&gt;F: Authentication
+  F-&gt;&gt;SC: store Authentication</pre>
+<ul><li>The filter builds an unauthenticated token and hands it to the <code>AuthenticationManager</code>.</li><li><code>ProviderManager</code> asks each <code>AuthenticationProvider</code> whether it supports the token.</li><li><code>DaoAuthenticationProvider</code> loads the user through your <code>UserDetailsService</code> and verifies the password with the <code>PasswordEncoder</code>.</li></ul>
+<pre><code class="language-java">@Service
+class DbUserDetailsService implements UserDetailsService {
+    private final UserRepository users;
+    DbUserDetailsService(UserRepository users) { this.users = users; }
+
+    @Override
+    public UserDetails loadUserByUsername(String username) {
+        return users.findByEmail(username)
+            .map(u -&gt; User.withUsername(u.getEmail())
+                          .password(u.getPasswordHash())
+                          .roles(u.getRoles().toArray(String[]::new))
+                          .disabled(!u.isActive())
+                          .build())
+            .orElseThrow(() -&gt; new UsernameNotFoundException("not found"));
+    }
+}</code></pre>
+<p>Expose a <code>UserDetailsService</code> bean and Spring Boot wires the provider for you. Return a generic "bad credentials" message so attackers cannot tell whether the username exists.</p>
+</blockquote>
+<p class="q" id="S5"><strong><span class="qid">S5</span> How does method-level security work (@PreAuthorize)? Role vs authority? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Enable it with <code>@EnableMethodSecurity</code> (Spring Security 6; replaces <code>@EnableGlobalMethodSecurity</code>). It is applied with AOP proxies, so the self-invocation limitations apply.</p>
+<pre><code class="language-java">@Configuration
+@EnableMethodSecurity
+class MethodSecurityConfig {}
+
+@Service
+class DocumentService {
+
+    @PreAuthorize("hasRole('ADMIN') or #ownerId == authentication.principal.id")
+    public List&lt;Document&gt; byOwner(Long ownerId) { ... }
+
+    @PreAuthorize("hasAuthority('DOC_DELETE')")
+    public void delete(Long id) { ... }
+
+    @PostAuthorize("returnObject.ownerId == authentication.principal.id")
+    public Document get(Long id) { ... }            // checks after loading
+}</code></pre>
+<p>An <strong>authority</strong> is a fine-grained permission string (<code>DOC_DELETE</code>). A <strong>role</strong> is an authority with the <code>ROLE_</code> prefix (<code>hasRole('ADMIN')</code> checks <code>ROLE_ADMIN</code>). Prefer permissions for logic and roles to group them. Use method security for <strong>business-level</strong> rules (ownership checks) and URL rules for coarse access; apply both (defense in depth).</p>
+</blockquote>
+<p class="q" id="S6"><strong><span class="qid">S6</span> What is CSRF, when do you need protection, and how is it different from CORS? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p><strong>CSRF</strong> (cross-site request forgery): a malicious site makes the victim's browser send a state-changing request to your site, and the browser attaches the victim's <strong>session cookie</strong> automatically. Spring Security defends by requiring a secret token (<code>_csrf</code>) on <code>POST/PUT/PATCH/DELETE</code> that a forged request cannot know.</p>
+<ul><li><strong>Needed</strong> for apps that authenticate with <strong>cookies/sessions</strong> (server-rendered apps, cookie-based SPAs). Keep it enabled.</li><li><strong>Not needed</strong> for stateless APIs where the client sends credentials explicitly in an <code>Authorization: Bearer</code> header, because the browser does not add that automatically. Disabling CSRF is fine in that case, but not for cookie auth.</li></ul>
+<p><strong>CORS</strong> is different: it is a browser mechanism that relaxes the same-origin policy for reads/responses from another origin. CORS does not stop CSRF (the request is still sent). Enable CORS in the security chain (<code>http.cors(...)</code>) so preflight requests are not blocked.</p>
+</blockquote>
+<p class="q" id="S7"><strong><span class="qid">S7</span> Implement stateless JWT authentication. What are the pitfalls? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>The simplest correct approach with Spring Security 6 is to make the API an <strong>OAuth2 resource server</strong> that validates JWTs, rather than writing a custom filter.</p>
+<pre><code class="language-java">@Bean
+SecurityFilterChain api(HttpSecurity http) throws Exception {
+    http.csrf(c -&gt; c.disable())
+        .sessionManagement(s -&gt; s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .authorizeHttpRequests(a -&gt; a.requestMatchers("/api/**").authenticated())
+        .oauth2ResourceServer(o -&gt; o.jwt(Customizer.withDefaults()));   // validates signature, exp, iss
+    return http.build();
+}
+// application.yml
+// spring.security.oauth2.resourceserver.jwt.issuer-uri: https://login.example.com/realms/shop
+// (public keys are fetched from the issuer's JWKS endpoint and cached)</code></pre>
+<pre class="mermaid">sequenceDiagram
+  participant C as Client
+  participant A as Auth server (issuer)
+  participant R as Resource server (Spring Boot API)
+  C-&gt;&gt;A: login (credentials or code flow)
+  A--&gt;&gt;C: signed JWT access token
+  C-&gt;&gt;R: GET /api/orders (Authorization: Bearer JWT)
+  R-&gt;&gt;R: verify signature (JWKS), exp, iss, aud
+  R--&gt;&gt;C: 200 data</pre>
+<p>Pitfalls: JWTs <strong>cannot be revoked</strong> before expiry, so keep access tokens short (5 to 15 minutes) with refresh tokens; never put secrets or sensitive data in the payload (it is only encoded, not encrypted); always validate signature, expiry, issuer and audience; prefer asymmetric keys (RS256/ES256); reject the <code>none</code> algorithm; and store tokens carefully in browsers (avoid <code>localStorage</code> for high-value apps; prefer <code>HttpOnly</code> cookies with CSRF protection or a backend-for-frontend).</p>
+</blockquote>
+<h2 id="experienced">Experienced</h2>
+<p class="q" id="S8"><strong><span class="qid">S8</span> Explain OAuth 2.0 and OpenID Connect. Which flow should a single-page app and a backend service use? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p><strong>OAuth 2.0</strong> is about <strong>delegated authorization</strong>: a client gets an access token to call an API on behalf of a user. <strong>OpenID Connect (OIDC)</strong> adds an identity layer on top: an <code>id_token</code> (a JWT about the user) and a <code>userinfo</code> endpoint, so it also handles <strong>login</strong>.</p>
+<p>Roles: resource owner (user), client (your app), authorization server (Keycloak, Okta, Auth0, Spring Authorization Server), resource server (the API).</p>
+<ul><li><strong>Browser/mobile apps:</strong> <strong>Authorization Code flow with PKCE</strong>. Never use the implicit flow or the password grant (both deprecated).</li><li><strong>Service to service (no user):</strong> <strong>Client Credentials</strong> flow.</li><li>Refresh tokens renew access without asking the user again.</li></ul>
+<pre class="mermaid">sequenceDiagram
+  participant U as User browser
+  participant C as Client app
+  participant A as Authorization server
+  participant R as Resource server (API)
+  U-&gt;&gt;C: open app
+  C-&gt;&gt;A: redirect with code_challenge (PKCE)
+  A-&gt;&gt;U: login and consent
+  A--&gt;&gt;C: authorization code (via redirect)
+  C-&gt;&gt;A: exchange code and code_verifier
+  A--&gt;&gt;C: access token, id token, refresh token
+  C-&gt;&gt;R: API call with access token
+  R--&gt;&gt;C: data</pre>
+<p>In Spring: <code>spring-boot-starter-oauth2-client</code> for login/clients (<code>oauth2Login()</code>), <code>spring-boot-starter-oauth2-resource-server</code> for APIs, and <strong>Spring Authorization Server</strong> if you must build your own issuer.</p>
+</blockquote>
+<p class="q" id="S9"><strong><span class="qid">S9</span> How do you secure a microservices architecture end to end? <span class="tag t-design">Design</span></strong></p>
+<blockquote>
+<pre class="mermaid">flowchart LR
+  U["User or SPA"] -- "Auth code + PKCE" --&gt; IDP["Identity provider&lt;br/&gt;(Keycloak, Okta)"]
+  U -- "Bearer JWT" --&gt; GW["API gateway&lt;br/&gt;validates token, rate limits"]
+  GW --&gt; S1["Order service&lt;br/&gt;resource server"]
+  GW --&gt; S2["Catalog service&lt;br/&gt;resource server"]
+  S1 -- "token relay or client credentials" --&gt; S3["Payment service"]
+  S1 -. "mTLS inside the mesh" .- S3
+  S1 --&gt; V[("Secrets manager")]</pre>
+<ul><li><strong>Central identity provider</strong> issues tokens; do not build login in every service.</li><li><strong>Gateway</strong> authenticates at the edge, applies coarse rules and rate limits; <strong>every service still validates the JWT itself</strong> (zero trust: never trust "internal" traffic).</li><li><strong>Propagate identity</strong> to downstream calls by relaying the user's token (Spring Cloud Gateway <code>TokenRelay</code>, <code>WebClient</code> filter), or use <strong>client credentials</strong> with narrow scopes when the call is not on behalf of a user.</li><li><strong>Encrypt in transit</strong> everywhere, using mTLS in a service mesh (Istio, Linkerd) where available.</li><li><strong>Least privilege:</strong> scopes and claims-to-authorities mapping per service; keep secrets in Vault or a cloud secrets manager, not in config files.</li><li><strong>Audit and observe:</strong> log authentication events with a correlation id, alert on anomalies.</li></ul>
+</blockquote>
+<p class="q" id="S10"><strong><span class="qid">S10</span> What are the common security vulnerabilities in a Spring web app and how do you mitigate them? <span class="tag t-scenario">Scenario</span></strong></p>
+<blockquote>
+<ul><li><strong>Injection (SQL/JPQL):</strong> use parameter binding and Spring Data methods; never concatenate user input into queries.</li><li><strong>Broken access control (IDOR):</strong> <code>GET /orders/42</code> must check that order 42 belongs to the caller; enforce with <code>@PreAuthorize</code> or ownership predicates in queries.</li><li><strong>XSS:</strong> escape output (Thymeleaf escapes by default), send a <code>Content-Security-Policy</code>; Spring Security adds security headers by default (<code>X-Content-Type-Options</code>, <code>X-Frame-Options</code>, HSTS on HTTPS).</li><li><strong>CSRF:</strong> see above; keep it on for cookie auth.</li><li><strong>Session fixation:</strong> Spring Security changes the session id on login by default; set cookies <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite</code>.</li><li><strong>Brute force and credential stuffing:</strong> rate limit login, add account lockout or exponential delay, support MFA.</li><li><strong>Mass assignment:</strong> bind to purpose-built DTOs, never directly to entities.</li><li><strong>Sensitive data exposure:</strong> lock down Actuator (<code>management.endpoints.web.exposure.include=health,info</code>, secure the rest), mask secrets in logs, keep dependencies patched (Dependabot, OWASP dependency check).</li><li><strong>SSRF / deserialization:</strong> validate outbound URLs; avoid Java native deserialization of untrusted data.</li></ul>
+</blockquote>
+<p class="q" id="S11"><strong><span class="qid">S11</span> Design fine-grained, multi-tenant authorization where users have roles per tenant and some rules depend on the resource (ABAC). <span class="tag t-design">Design</span></strong></p>
+<blockquote>
+<p>Plain roles (<code>ROLE_ADMIN</code>) are too coarse when "Alice is ADMIN in tenant A but VIEWER in tenant B" and rules depend on resource attributes.</p>
+<pre class="mermaid">flowchart LR
+  T["Request + JWT&lt;br/&gt;(sub, tenant)"] --&gt; F["Tenant resolution filter&lt;br/&gt;sets TenantContext"]
+  F --&gt; C["Controller"]
+  C --&gt; S["Service&lt;br/&gt;@PreAuthorize(hasPermission)"]
+  S --&gt; PE["Custom PermissionEvaluator"]
+  PE --&gt; P[("Permissions store&lt;br/&gt;user, tenant, role, resource rules")]
+  S --&gt; R["Repository&lt;br/&gt;always filters by tenant_id"]</pre>
+<pre><code class="language-java">@Component
+class TenantPermissionEvaluator implements PermissionEvaluator {
+    private final MembershipRepository memberships;
+    TenantPermissionEvaluator(MembershipRepository m) { this.memberships = m; }
+
+    @Override
+    public boolean hasPermission(Authentication auth, Object target, Object permission) {
+        if (target instanceof Document d) {
+            return memberships.roleOf(auth.getName(), d.getTenantId())
+                              .map(role -&gt; role.allows(permission.toString()))
+                              .orElse(false);
+        }
+        return false;
+    }
+    @Override
+    public boolean hasPermission(Authentication a, Serializable id, String type, Object permission) { return false; }
+}
+
+@PreAuthorize("hasPermission(#doc, 'WRITE')")
+public void update(Document doc) { ... }</code></pre>
+<p>Key design rules: <strong>resolve the tenant once</strong> per request from a trusted source (token claim, not a client header) and apply it everywhere; add <code>tenant_id</code> filtering to <strong>every query</strong> (Hibernate <code>@Filter</code>, row-level security in PostgreSQL, or schema per tenant) so one missed <code>where</code> cannot leak data; keep permissions in data, cached with a short TTL, so rules change without redeploying; and test the negative cases (user A reading tenant B) explicitly. For rules at scale, consider an external policy engine (OPA, Cedar, Spring Authorization's <code>AuthorizationManager</code>).</p>
+</blockquote>
+<footer class="foot">Answers target Spring Framework 6 and Spring Boot 3 (Java 17+). Verify version-specific details against the official reference documentation before an interview.</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="../../assets/script.js"></script>
+<script src="../../assets/qa.js"></script>
+</body>
+</html>

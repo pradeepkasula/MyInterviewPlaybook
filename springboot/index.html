@@ -3,17 +3,56 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Spring Boot | My Interview Playbook</title>
-<meta name="description" content="Spring Boot interview track. Coming soon.">
+<title>Spring Boot Interview Questions | My Interview Playbook</title>
+<meta name="description" content="Spring Boot interview questions from beginner to experienced: theory, coding and scenario questions with architecture diagrams.">
 <link rel="stylesheet" href="../assets/landing.css">
 </head>
 <body>
-<main class="wrap narrow">
-  <a class="back" href="../">&larr; All tracks</a>
-  <span class="badge soon">Coming soon</span>
+<header class="top"><div class="wrap">
+  <a class="back light" href="../">&larr; All tracks</a>
+  <p class="eyebrow">Interview track</p>
   <h1>Spring Boot</h1>
-  <p class="lead">Auto-configuration, starters, Actuator, microservices, testing and production readiness.</p>
-  <p class="muted">This track is being prepared. It will follow the same layout as the <a href="../systemdesign/">System Design guide</a>: a table of what to know, interview questions and scenarios with model answers.</p>
+  <p class="sub">Spring Boot interview questions from beginner to experienced: theory, coding and scenario questions with architecture diagrams. 65 questions across 7 topics.</p>
+</div></header>
+<main class="wrap">
+  <h2 class="section-title">Topics</h2>
+  <ul class="grid">
+    <li><a class="card" href="fundamentals/">
+      <div class="thumb g-boot"><span class="mono">Boot</span></div>
+      <div class="body"><span class="badge">10 questions</span><h3>Boot Fundamentals and Auto-configuration</h3><p>What Spring Boot adds, starters, how auto-configuration and startup work, embedded servers, custom starters and Boot 3 migration.</p><p class="lv">3 beginner &middot; 4 intermediate &middot; 3 experienced</p></div>
+    </a></li>
+
+    <li><a class="card" href="config/">
+      <div class="thumb g-boot"><span class="mono">Cfg</span></div>
+      <div class="body"><span class="badge">9 questions</span><h3>Configuration and Profiles</h3><p>Properties and YAML, profiles, @Value vs @ConfigurationProperties, precedence, containers and secrets, and conditional beans.</p><p class="lv">3 beginner &middot; 4 intermediate &middot; 2 experienced</p></div>
+    </a></li>
+
+    <li><a class="card" href="data/">
+      <div class="thumb g-boot"><span class="mono">Data</span></div>
+      <div class="body"><span class="badge">10 questions</span><h3>Data, Caching and Migrations</h3><p>DataSource auto-configuration, ddl-auto vs Flyway, Spring Cache with Redis, cache pitfalls, multiple datasources and scheduled jobs.</p><p class="lv">3 beginner &middot; 4 intermediate &middot; 3 experienced</p></div>
+    </a></li>
+
+    <li><a class="card" href="actuator/">
+      <div class="thumb g-boot"><span class="mono">Obs</span></div>
+      <div class="body"><span class="badge">9 questions</span><h3>Actuator and Observability</h3><p>Actuator endpoints, health probes, Micrometer metrics, distributed tracing, logging and diagnosing production issues.</p><p class="lv">3 beginner &middot; 3 intermediate &middot; 3 experienced</p></div>
+    </a></li>
+
+    <li><a class="card" href="testing/">
+      <div class="thumb g-boot"><span class="mono">Test</span></div>
+      <div class="body"><span class="badge">9 questions</span><h3>Testing Spring Boot Applications</h3><p>Test slices, MockMvc, mocking beans, Testcontainers, security testing, contract testing and keeping the suite fast.</p><p class="lv">3 beginner &middot; 3 intermediate &middot; 3 experienced</p></div>
+    </a></li>
+
+    <li><a class="card" href="microservices/">
+      <div class="thumb g-boot"><span class="mono">uSvc</span></div>
+      <div class="body"><span class="badge">9 questions</span><h3>Microservices with Spring Boot</h3><p>Service boundaries, gateway and discovery, resilience patterns, Kafka messaging, saga and outbox, and system design scenarios.</p><p class="lv">3 beginner &middot; 3 intermediate &middot; 3 experienced</p></div>
+    </a></li>
+
+    <li><a class="card" href="deployment/">
+      <div class="thumb g-boot"><span class="mono">Ops</span></div>
+      <div class="body"><span class="badge">9 questions</span><h3>Deployment and Performance</h3><p>Executable jars, Docker images, graceful shutdown, Kubernetes, JVM tuning, virtual threads, native images and load-test scenarios.</p><p class="lv">3 beginner &middot; 3 intermediate &middot; 3 experienced</p></div>
+    </a></li>
+  </ul>
 </main>
+<footer class="foot">Prepared by Pradeep Kasula &middot; <a href="https://pradeepkasula.github.io/">Portfolio</a></footer>
 </body>
 </html>

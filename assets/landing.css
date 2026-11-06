@@ -60,3 +60,8 @@ a { color: var(--link); }
 .muted { color: var(--muted); }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } html { scroll-behavior: auto; } }
+
+/* track hubs */
+.thumb .mono { font-size: 2.6rem; font-weight: 800; color: #14532d; letter-spacing: .02em; text-shadow: 0 2px 0 rgba(255,255,255,.5); }
+.body p.lv { flex: none; font-size: .82rem; }
+.back.light { color: #fff; opacity: .9; margin-bottom: 8px; }

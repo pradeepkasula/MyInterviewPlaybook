@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spring WebFlux Interview Questions | My Interview Playbook</title>
+<meta name="description" content="Reactive streams, Mono and Flux, backpressure, schedulers, WebClient, error handling and when to choose WebFlux over MVC.">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/qa.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+<button class="menu-btn" id="menuBtn" aria-label="Toggle contents" aria-expanded="false">Contents</button>
+<aside class="sidebar" id="sidebar">
+  <a class="back" href="../">&larr; Spring track</a>
+  <p class="side-title">On this page</p>
+  <nav>
+<a href="#top-of-page">Overview</a>
+<a href="#beginner">Beginner <span class="cnt">3</span></a>
+<a href="#intermediate">Intermediate <span class="cnt">3</span></a>
+<a href="#experienced">Experienced <span class="cnt">4</span></a>
+  </nav>
+  <p class="side-title" style="margin-top:20px">Spring topics</p>
+  <nav class="topics">
+<a href="../core/">Spring Core</a>
+<a href="../aop/">Spring AOP</a>
+<a href="../web/">Spring Web MVC</a>
+<a href="../webflux/" class="here">Spring WebFlux</a>
+<a href="../orm/">Spring ORM and Data JPA</a>
+<a href="../rest/">Spring REST API Design</a>
+<a href="../security/">Spring Security</a>
+  </nav>
+  <label class="practice"><input type="checkbox" id="practice"> Practice mode<span>Hide answers. Click a question to reveal its answer.</span></label>
+</aside>
+<main class="content">
+<header class="hero" id="top-of-page"><p class="eyebrow">Spring interview playbook</p><h1 class="doc-title">Spring WebFlux</h1><p class="subtitle">Reactive streams, Mono and Flux, backpressure, schedulers, WebClient, error handling and when to choose WebFlux over MVC.</p><p class="intro">10 questions: Beginner 3 &middot; Intermediate 3 &middot; Experienced 4. Each question is tagged <span class="tag t-theory">Theory</span> <span class="tag t-coding">Coding</span> <span class="tag t-scenario">Scenario</span> <span class="tag t-design">Design</span>. Use Practice mode to hide the answers and test yourself.</p></header>
+<h2 id="beginner">Beginner</h2>
+<p class="q" id="X1"><strong><span class="qid">X1</span> What is reactive programming and what is Spring WebFlux? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>Reactive programming is a style built around <strong>asynchronous, non-blocking data streams</strong> with <strong>backpressure</strong>. Instead of a thread waiting for a result, you describe a pipeline and the framework runs it as data arrives.</p>
+<p>Spring WebFlux is Spring's reactive web stack. It runs on an event-loop server (Netty by default) with a <strong>small, fixed number of threads</strong> that never block, and uses <strong>Project Reactor</strong> types:</p>
+<ul><li><code>Mono&lt;T&gt;</code>: 0 or 1 element (like an async <code>Optional</code>).</li><li><code>Flux&lt;T&gt;</code>: 0 to N elements (an async stream).</li></ul>
+<p>Nothing happens until someone <strong>subscribes</strong>. In WebFlux the framework subscribes for you when it writes the response.</p>
+<pre><code class="language-java">@GetMapping("/users/{id}")
+Mono&lt;User&gt; get(@PathVariable String id) {
+    return repo.findById(id);            // returns immediately, a pipeline, not a value
+}</code></pre>
+</blockquote>
+<p class="q" id="X2"><strong><span class="qid">X2</span> What is the difference between Spring MVC and WebFlux, and when would you choose each? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<div class="table-wrap"><table><thead><tr><th></th><th>Spring MVC</th><th>Spring WebFlux</th></tr></thead><tbody><tr><td>Model</td><td>Thread per request, blocking</td><td>Event loop, non-blocking</td></tr><tr><td>Server</td><td>Tomcat, Jetty, Undertow</td><td>Netty (default), also servlet 3.1+ containers</td></tr><tr><td>Code style</td><td>Imperative, easy to debug</td><td>Declarative pipelines, harder to debug</td></tr><tr><td>Data access</td><td>JDBC / JPA (blocking)</td><td>R2DBC, reactive Mongo/Redis/Cassandra</td></tr><tr><td>Best for</td><td>Most CRUD and business apps</td><td>Streaming, very high concurrency with many slow I/O calls, gateways</td></tr></tbody></table></div>
+<p>Choose WebFlux when you have <strong>end-to-end non-blocking</strong> dependencies and need to hold many concurrent connections cheaply (SSE, websockets, API gateway, aggregators). Choose MVC when your stack is JDBC/JPA or the team is not reactive-experienced. With <strong>virtual threads</strong> (Java 21, Boot 3.2+), MVC now gets much of the scalability benefit with simple blocking code, so the case for WebFlux is narrower than before. WebFlux does not make a single request faster; it lets you serve more concurrent requests per thread.</p>
+</blockquote>
+<p class="q" id="X3"><strong><span class="qid">X3</span> What is backpressure? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>Backpressure lets a <strong>slow consumer tell a fast producer how much data it can handle</strong>, so memory does not blow up. In the Reactive Streams specification the subscriber requests <code>n</code> items with <code>request(n)</code>, and the publisher must not emit more than requested.</p>
+<pre><code class="language-java">Flux.range(1, 1_000_000)
+    .onBackpressureBuffer(1000)              // buffer up to 1000, then error (or choose drop/latest)
+    .publishOn(Schedulers.boundedElastic())
+    .subscribe(new BaseSubscriber&lt;&gt;() {
+        @Override protected void hookOnSubscribe(Subscription s) { request(10); }
+        @Override protected void hookOnNext(Integer v) { process(v); request(1); }
+    });</code></pre>
+<p>Strategies when a consumer cannot keep up: buffer (bounded), <code>onBackpressureDrop</code>, <code>onBackpressureLatest</code>, or fail with an error. Over an HTTP connection, TCP flow control and Netty propagate backpressure to the client.</p>
+</blockquote>
+<h2 id="intermediate">Intermediate</h2>
+<p class="q" id="X4"><strong><span class="qid">X4</span> What is the difference between map and flatMap in Reactor? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<ul><li><code>map</code>: a <strong>synchronous 1-to-1</strong> transformation of each element, <code>T -&gt; R</code>.</li><li><code>flatMap</code>: an <strong>asynchronous transformation that returns a publisher</strong>, <code>T -&gt; Publisher&lt;R&gt;</code>, and merges the results. Results may arrive out of order and run concurrently.</li></ul>
+<pre><code class="language-java">Mono&lt;UserProfile&gt; profile(String id) {
+    return userRepo.findById(id)                                  // Mono&lt;User&gt;
+        .map(user -&gt; new UserView(user.name(), user.email()))     // plain function, so map
+        .flatMap(view -&gt;                                          // returns Mono, so flatMap
+            avatarClient.fetch(view.name())
+                        .map(avatar -&gt; new UserProfile(view, avatar)));
+}
+
+Flux&lt;Order&gt; ordersOfUsers(Flux&lt;String&gt; userIds) {
+    return userIds.flatMap(orderClient::findOrders, 8);           // concurrency of 8, order not preserved
+}</code></pre>
+<p>Use <code>concatMap</code> when ordering matters (it processes sequentially). Using <code>map</code> with something that returns a <code>Mono</code> leaves you with <code>Mono&lt;Mono&lt;T&gt;&gt;</code>, a common beginner bug.</p>
+</blockquote>
+<p class="q" id="X5"><strong><span class="qid">X5</span> Annotated controllers vs functional endpoints in WebFlux? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Both run on the same reactive infrastructure. Annotated controllers look like MVC (<code>@GetMapping</code>). Functional endpoints define routes as code with <code>RouterFunction</code> and <code>HandlerFunction</code>, which is explicit and easy to compose.</p>
+<pre><code class="language-java">@Configuration
+class UserRoutes {
+    @Bean
+    RouterFunction&lt;ServerResponse&gt; routes(UserHandler h) {
+        return RouterFunctions.route()
+            .GET("/users/{id}", h::get)
+            .POST("/users", h::create)
+            .build();
+    }
+}
+
+@Component
+class UserHandler {
+    private final UserRepository repo;
+    UserHandler(UserRepository repo) { this.repo = repo; }
+
+    Mono&lt;ServerResponse&gt; get(ServerRequest req) {
+        return repo.findById(req.pathVariable("id"))
+            .flatMap(u -&gt; ServerResponse.ok().bodyValue(u))
+            .switchIfEmpty(ServerResponse.notFound().build());
+    }
+}</code></pre>
+<p>Pick annotated style for familiarity and tooling (validation, OpenAPI). Pick functional style for dynamic routing and tiny services.</p>
+</blockquote>
+<p class="q" id="X6"><strong><span class="qid">X6</span> What are Schedulers, publishOn and subscribeOn, and what is the number one rule of WebFlux? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p><strong>Rule: never block an event-loop thread.</strong> Netty uses only a few threads (roughly the CPU count), so one blocking call (<code>Thread.sleep</code>, JDBC, a blocking HTTP client, <code>.block()</code>) stalls many requests.</p>
+<ul><li><code>subscribeOn(scheduler)</code>: sets the thread where the <strong>subscription (source)</strong> runs.</li><li><code>publishOn(scheduler)</code>: switches the thread for <strong>everything downstream</strong> of it.</li><li><code>Schedulers.boundedElastic()</code>: a pool intended for <strong>unavoidable blocking</strong> work (legacy JDBC, file I/O).</li><li><code>Schedulers.parallel()</code>: for CPU-bound, non-blocking work.</li></ul>
+<pre><code class="language-java">Mono&lt;Report&gt; report(String id) {
+    return Mono.fromCallable(() -&gt; legacyJdbcDao.load(id))   // blocking call
+               .subscribeOn(Schedulers.boundedElastic());     // moved off the event loop
+}</code></pre>
+<p>Use BlockHound in tests to detect accidental blocking calls on non-blocking threads.</p>
+</blockquote>
+<h2 id="experienced">Experienced</h2>
+<p class="q" id="X7"><strong><span class="qid">X7</span> How do you handle errors, retries and timeouts in a reactive pipeline? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Errors are signals that flow down the pipeline; use operators instead of try/catch.</p>
+<pre><code class="language-java">Mono&lt;Price&gt; price(String sku) {
+    return webClient.get().uri("/prices/{sku}", sku)
+        .retrieve()
+        .onStatus(HttpStatusCode::is4xxClientError,
+                  r -&gt; Mono.error(new BadRequestException("bad sku " + sku)))
+        .bodyToMono(Price.class)
+        .timeout(Duration.ofSeconds(2))                                    // fail if no result in 2s
+        .retryWhen(Retry.backoff(3, Duration.ofMillis(200))                // exponential backoff
+                        .filter(ex -&gt; ex instanceof WebClientRequestException))   // transient errors only
+        .onErrorResume(TimeoutException.class, ex -&gt; Mono.just(Price.unknown(sku))); // fallback
+}</code></pre>
+<p>Key operators: <code>onErrorReturn</code> (static fallback), <code>onErrorResume</code> (fallback publisher), <code>onErrorMap</code> (translate an exception), <code>retryWhen</code> (with backoff), <code>timeout</code>, <code>doOnError</code> (side effect, logging only). For global HTTP error mapping use <code>@RestControllerAdvice</code> or a <code>WebExceptionHandler</code>. As with MVC, retry only idempotent calls.</p>
+</blockquote>
+<p class="q" id="X8"><strong><span class="qid">X8</span> How do you call several downstream services in parallel with WebClient and combine the results? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p><code>WebClient</code> is the non-blocking replacement for <code>RestTemplate</code>. Independent calls are started together and combined with <code>Mono.zip</code>, so total latency is the slowest call instead of the sum.</p>
+<pre><code class="language-java">Mono&lt;ProductPage&gt; productPage(String id) {
+    Mono&lt;Product&gt;   product = catalog.get().uri("/products/{id}", id).retrieve().bodyToMono(Product.class);
+    Mono&lt;Price&gt;     price   = pricing.get().uri("/prices/{id}", id).retrieve().bodyToMono(Price.class)
+                                .onErrorReturn(Price.unavailable());                 // degrade gracefully
+    Mono&lt;List&lt;Review&gt;&gt; reviews = reviewsClient.get().uri("/reviews/{id}", id).retrieve()
+                                .bodyToFlux(Review.class).collectList()
+                                .timeout(Duration.ofMillis(500)).onErrorReturn(List.of());
+
+    return Mono.zip(product, price, reviews)
+               .map(t -&gt; new ProductPage(t.getT1(), t.getT2(), t.getT3()));
+}</code></pre>
+<pre class="mermaid">flowchart LR
+  C["Client"] --&gt; A["Aggregator&lt;br/&gt;(WebFlux)"]
+  A -- "parallel" --&gt; P["Catalog service"]
+  A -- "parallel" --&gt; Q["Pricing service"]
+  A -- "parallel, 500 ms timeout" --&gt; R["Reviews service"]
+  P --&gt; A
+  Q --&gt; A
+  R --&gt; A
+  A --&gt; C</pre>
+<p>Configure <code>WebClient</code> with a shared connection pool and explicit connect/response timeouts (Reactor Netty <code>HttpClient</code>), and build it once as a bean; do not create a new client per request.</p>
+</blockquote>
+<p class="q" id="X9"><strong><span class="qid">X9</span> Can you use JPA/Hibernate with WebFlux? What are the alternatives? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<p>JPA and JDBC are <strong>blocking</strong>, so calling them directly on an event-loop thread is a bug. Options:</p>
+<ul><li><strong>R2DBC</strong> (Spring Data R2DBC): reactive relational drivers (PostgreSQL, MySQL, SQL Server, H2). It is a lighter mapper, with no lazy loading, no persistence context and weaker support for complex relationships.</li><li><strong>Reactive NoSQL</strong>: Spring Data MongoDB Reactive, Redis, Cassandra, Elasticsearch.</li><li><strong>Wrap blocking code</strong> on <code>Schedulers.boundedElastic()</code>. This is acceptable for a few legacy calls, but it defeats the purpose if most of the app is blocking.</li></ul>
+<p>Transactions in a reactive app use <code>TransactionalOperator</code> or <code>@Transactional</code> on methods returning <code>Mono</code>/<code>Flux</code>, and the transaction context propagates through the Reactor <code>Context</code>, not through a <code>ThreadLocal</code>. This also means <code>SecurityContextHolder</code> and MDC logging behave differently; use <code>ReactiveSecurityContextHolder</code> and Reactor context propagation.</p>
+</blockquote>
+<p class="q" id="X10"><strong><span class="qid">X10</span> Design a real-time stock-price dashboard that pushes updates to 50,000 browsers. <span class="tag t-design">Design</span></strong></p>
+<blockquote>
+<p>This is a good fit for WebFlux: many long-lived, mostly idle connections.</p>
+<pre class="mermaid">flowchart LR
+  EX["Market data source"] --&gt; K[("Kafka topic")]
+  K --&gt; S["WebFlux service&lt;br/&gt;(reactor-kafka consumer)"]
+  S --&gt; SINK["Sinks.Many multicast&lt;br/&gt;(per symbol)"]
+  SINK -- "SSE or WebSocket" --&gt; B1["Browser"]
+  SINK -- "SSE or WebSocket" --&gt; B2["Browser"]
+  SINK -- "SSE or WebSocket" --&gt; B3["Browser"]
+  LB["Load balancer&lt;br/&gt;(sticky or stateless)"] --- S</pre>
+<pre><code class="language-java">@GetMapping(value = "/prices/{symbol}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+Flux&lt;Price&gt; stream(@PathVariable String symbol) {
+    return priceHub.stream(symbol)                      // shared hot Flux from a multicast sink
+                   .onBackpressureLatest()              // slow clients only get the newest price
+                   .timeout(Duration.ofMinutes(5));
+}</code></pre>
+<p>Design points: <strong>Server-Sent Events</strong> for one-way updates (simple, auto-reconnect) or WebSocket for two-way; one shared upstream subscription per symbol multicast to all subscribers; <code>onBackpressureLatest</code> so slow clients never cause unbounded buffers; horizontal scaling with each instance consuming the topic; connection limits and heartbeats to detect dead clients.</p>
+</blockquote>
+<footer class="foot">Answers target Spring Framework 6 and Spring Boot 3 (Java 17+). Verify version-specific details against the official reference documentation before an interview.</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="../../assets/script.js"></script>
+<script src="../../assets/qa.js"></script>
+</body>
+</html>

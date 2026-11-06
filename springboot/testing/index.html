@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Testing Spring Boot Applications Interview Questions | My Interview Playbook</title>
+<meta name="description" content="Test slices, MockMvc, mocking beans, Testcontainers, security testing, contract testing and keeping the suite fast.">
+<link rel="stylesheet" href="../../assets/style.css">
+<link rel="stylesheet" href="../../assets/qa.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+</head>
+<body>
+<button class="menu-btn" id="menuBtn" aria-label="Toggle contents" aria-expanded="false">Contents</button>
+<aside class="sidebar" id="sidebar">
+  <a class="back" href="../">&larr; Spring Boot track</a>
+  <p class="side-title">On this page</p>
+  <nav>
+<a href="#top-of-page">Overview</a>
+<a href="#beginner">Beginner <span class="cnt">3</span></a>
+<a href="#intermediate">Intermediate <span class="cnt">3</span></a>
+<a href="#experienced">Experienced <span class="cnt">3</span></a>
+  </nav>
+  <p class="side-title" style="margin-top:20px">Spring Boot topics</p>
+  <nav class="topics">
+<a href="../fundamentals/">Boot Fundamentals and Auto-configuration</a>
+<a href="../config/">Configuration and Profiles</a>
+<a href="../data/">Data, Caching and Migrations</a>
+<a href="../actuator/">Actuator and Observability</a>
+<a href="../testing/" class="here">Testing Spring Boot Applications</a>
+<a href="../microservices/">Microservices with Spring Boot</a>
+<a href="../deployment/">Deployment and Performance</a>
+  </nav>
+  <label class="practice"><input type="checkbox" id="practice"> Practice mode<span>Hide answers. Click a question to reveal its answer.</span></label>
+</aside>
+<main class="content">
+<header class="hero" id="top-of-page"><p class="eyebrow">Spring Boot interview playbook</p><h1 class="doc-title">Testing Spring Boot Applications</h1><p class="subtitle">Test slices, MockMvc, mocking beans, Testcontainers, security testing, contract testing and keeping the suite fast.</p><p class="intro">9 questions: Beginner 3 &middot; Intermediate 3 &middot; Experienced 3. Each question is tagged <span class="tag t-theory">Theory</span> <span class="tag t-coding">Coding</span> <span class="tag t-scenario">Scenario</span> <span class="tag t-design">Design</span>. Use Practice mode to hide the answers and test yourself.</p></header>
+<h2 id="beginner">Beginner</h2>
+<p class="q" id="T1"><strong><span class="qid">T1</span> What is the difference between @SpringBootTest and the test slice annotations? <span class="tag t-theory">Theory</span></strong></p>
+<blockquote>
+<ul><li><strong><code>@SpringBootTest</code></strong> starts the <strong>full application context</strong> (optionally with a real server on a random port). Use it for a few end-to-end integration tests.</li><li><strong>Test slices</strong> load only the beans for one layer, so they start faster and focus the test:</li></ul>
+<div class="table-wrap"><table><thead><tr><th>Annotation</th><th>Loads</th><th>Typical use</th></tr></thead><tbody><tr><td><code>@WebMvcTest(Controller.class)</code></td><td>MVC layer, filters, converters; <strong>no</strong> services</td><td>Controller behavior, validation, JSON, status codes</td></tr><tr><td><code>@DataJpaTest</code></td><td>JPA repositories, Hibernate, embedded or container DB; transactional</td><td>Repository queries, mappings</td></tr><tr><td><code>@JsonTest</code></td><td>Jackson <code>ObjectMapper</code></td><td>Serialization rules</td></tr><tr><td><code>@RestClientTest</code></td><td><code>RestClient</code>/<code>RestTemplate</code> with a mock server</td><td>HTTP clients</td></tr><tr><td><code>@WebFluxTest</code></td><td>Reactive web layer</td><td>WebFlux controllers with <code>WebTestClient</code></td></tr></tbody></table></div>
+<p>The testing pyramid applies: many fast unit tests (no Spring at all), a moderate number of slice tests, and few full-context tests.</p>
+</blockquote>
+<p class="q" id="T2"><strong><span class="qid">T2</span> How do you unit test a service without starting Spring? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Use plain JUnit 5 and Mockito. This is the fastest and most valuable level, and another reason to prefer constructor injection.</p>
+<pre><code class="language-java">@ExtendWith(MockitoExtension.class)
+class OrderServiceTest {
+
+    @Mock OrderRepository repo;
+    @Mock PaymentGateway gateway;
+    @InjectMocks OrderService service;
+
+    @Test
+    void placesOrderWhenPaymentSucceeds() {
+        when(gateway.charge(any())).thenReturn(PaymentResult.ok("tx-1"));
+        when(repo.save(any(Order.class))).thenAnswer(inv -&gt; inv.getArgument(0));
+
+        Order result = service.place(new OrderRequest("sku-1", 2));
+
+        assertThat(result.getStatus()).isEqualTo(OrderStatus.PAID);
+        verify(gateway).charge(argThat(r -&gt; r.amount().equals(Money.of(20))));
+    }
+
+    @Test
+    void doesNotSaveWhenPaymentFails() {
+        when(gateway.charge(any())).thenThrow(new PaymentDeclinedException());
+        assertThatThrownBy(() -&gt; service.place(new OrderRequest("sku-1", 2)))
+            .isInstanceOf(PaymentDeclinedException.class);
+        verifyNoInteractions(repo);
+    }
+}</code></pre>
+</blockquote>
+<p class="q" id="T3"><strong><span class="qid">T3</span> How do you test a controller with MockMvc? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p><code>@WebMvcTest</code> loads only the web layer, so mock the services it calls. In Spring Boot 3.4+ use <code>@MockitoBean</code> (Spring Framework 6.2); <code>@MockBean</code> is deprecated there but identical in purpose and still common in older code.</p>
+<pre><code class="language-java">@WebMvcTest(BookController.class)
+class BookControllerTest {
+
+    @Autowired MockMvc mvc;
+    @MockitoBean BookService service;          // @MockBean on Boot 3.3 and earlier
+
+    @Test
+    void returnsBook() throws Exception {
+        when(service.get(1L)).thenReturn(new BookDto(1L, "Clean Code"));
+
+        mvc.perform(get("/api/v1/books/1").accept(MediaType.APPLICATION_JSON))
+           .andExpect(status().isOk())
+           .andExpect(jsonPath("$.title").value("Clean Code"));
+    }
+
+    @Test
+    void rejectsInvalidBody() throws Exception {
+        mvc.perform(post("/api/v1/books")
+               .contentType(MediaType.APPLICATION_JSON)
+               .content("{\"title\":\"\"}"))
+           .andExpect(status().isBadRequest())
+           .andExpect(jsonPath("$.errors.title").exists());
+    }
+}</code></pre>
+</blockquote>
+<h2 id="intermediate">Intermediate</h2>
+<p class="q" id="T4"><strong><span class="qid">T4</span> Why not test repositories with H2, and how do you use Testcontainers instead? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>H2 behaves differently from PostgreSQL/MySQL (SQL dialect, JSON types, locking, sequences, constraints), so tests can pass while production fails. <strong>Testcontainers</strong> runs the real database in a Docker container for the test.</p>
+<pre><code class="language-java">@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)   // do not swap in H2
+@Testcontainers
+class OrderRepositoryTest {
+
+    @Container
+    @ServiceConnection                                  // Boot 3.1+: wires URL, user and password automatically
+    static PostgreSQLContainer&lt;?&gt; postgres = new PostgreSQLContainer&lt;&gt;("postgres:16");
+
+    @Autowired OrderRepository repo;
+
+    @Test
+    void findsOrdersByCustomer() {
+        repo.save(new Order("c-1", Money.of(10)));
+        assertThat(repo.findByCustomerId("c-1")).hasSize(1);
+    }
+}</code></pre>
+<p><code>@ServiceConnection</code> replaced the older <code>@DynamicPropertySource</code> boilerplate. Run the same Flyway migrations as production, share one container across test classes (static singleton or <code>withReuse</code>) to keep the suite fast, and add containers for Kafka, Redis and others the same way.</p>
+</blockquote>
+<p class="q" id="T5"><strong><span class="qid">T5</span> How do you test secured endpoints? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<p>Use the Spring Security test support: <code>@WithMockUser</code>, a <code>jwt()</code> request post-processor, or <code>@WithUserDetails</code>.</p>
+<pre><code class="language-java">@WebMvcTest(AdminController.class)
+@Import(SecurityConfig.class)                          // load your real security rules
+class AdminControllerTest {
+
+    @Autowired MockMvc mvc;
+
+    @Test
+    void anonymousIsUnauthorized() throws Exception {
+        mvc.perform(get("/api/admin/users")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void userIsForbidden() throws Exception {
+        mvc.perform(get("/api/admin/users")).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminWithJwtIsAllowed() throws Exception {
+        mvc.perform(get("/api/admin/users")
+               .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+           .andExpect(status().isOk());
+    }
+}</code></pre>
+<p>Always test the <strong>negative</strong> paths (anonymous, wrong role, other tenant's data), and for state-changing requests on cookie-authenticated apps include <code>.with(csrf())</code>.</p>
+</blockquote>
+<p class="q" id="T6"><strong><span class="qid">T6</span> How do you test code that depends on an external REST API or messaging? <span class="tag t-coding">Coding</span></strong></p>
+<blockquote>
+<ul><li><strong>HTTP clients:</strong> <code>@RestClientTest</code> with <code>MockRestServiceServer</code> for unit-level checks, or <strong>WireMock</strong> / MockWebServer for realistic behavior (delays, faults, status codes).</li><li><strong>Kafka:</strong> Testcontainers Kafka for integration tests, or <code>@EmbeddedKafka</code> for lighter ones. Use <strong>Awaitility</strong> to wait for asynchronous results instead of <code>Thread.sleep</code>.</li><li><strong>Time and randomness:</strong> inject a <code>Clock</code> and ID generator so tests are deterministic.</li></ul>
+<pre><code class="language-java">@Test
+void publishesEventAfterOrderPlaced() {
+    service.place(request);
+
+    await().atMost(Duration.ofSeconds(5)).untilAsserted(() -&gt; {
+        ConsumerRecord&lt;String, String&gt; rec = KafkaTestUtils.getSingleRecord(consumer, "orders.placed");
+        assertThat(rec.value()).contains("sku-1");
+    });
+}</code></pre>
+</blockquote>
+<h2 id="experienced">Experienced</h2>
+<p class="q" id="T7"><strong><span class="qid">T7</span> Your integration test suite takes 25 minutes. How do you speed it up? <span class="tag t-scenario">Scenario</span></strong></p>
+<blockquote>
+<p>Find what is slow, then remove cost in order of impact.</p>
+<ol><li><strong>Fewer application contexts.</strong> Spring caches the context by configuration; every distinct combination of <code>@MockitoBean</code>, <code>@TestPropertySource</code>, <code>@ActiveProfiles</code> or <code>@DirtiesContext</code> creates a <strong>new context</strong> (a slow restart). Standardize a shared base configuration and avoid <code>@DirtiesContext</code>.</li><li><strong>Right-size the tests.</strong> Replace <code>@SpringBootTest</code> with slices or plain unit tests where possible; test business rules without Spring.</li><li><strong>Reuse containers</strong> across the suite (static or singleton containers, Testcontainers reuse) and start them in parallel.</li><li><strong>Roll back instead of reset.</strong> Use <code>@Transactional</code> tests (when the code under test runs in the same thread) or truncate tables quickly, instead of rebuilding the schema.</li><li><strong>Parallelize</strong> with JUnit 5 (<code>junit.jupiter.execution.parallel.enabled=true</code>) and CI sharding, after making tests independent.</li><li>Keep slow end-to-end tests in a separate pipeline stage that runs less often.</li></ol>
+<p>Use the build scan or surefire timings to see the slowest tests; a handful usually account for most of the time.</p>
+</blockquote>
+<p class="q" id="T8"><strong><span class="qid">T8</span> How do you make sure two microservices stay compatible without brittle end-to-end tests? <span class="tag t-design">Design</span></strong></p>
+<blockquote>
+<p>Use <strong>consumer-driven contract testing</strong> (Spring Cloud Contract or Pact).</p>
+<pre class="mermaid">flowchart LR
+  C["Consumer service&lt;br/&gt;writes expectations"] --&gt; K[("Contract&lt;br/&gt;request and response shape")]
+  K --&gt; P["Provider build&lt;br/&gt;generates tests from the contract"]
+  P --&gt; V{"Provider still&lt;br/&gt;satisfies it?"}
+  V -- "yes" --&gt; OK["Deploy safely"]
+  V -- "no" --&gt; F["Build fails before release"]
+  K --&gt; S["Consumer tests run against&lt;br/&gt;generated stubs"]</pre>
+<ul><li>The consumer states what it needs (fields, status codes); the contract is the shared artifact.</li><li>The <strong>provider's build</strong> verifies it still honors every consumer contract, so a breaking change fails in CI instead of production.</li><li>The consumer's tests run against <strong>stubs generated from the contract</strong>, so they stay fast and need no running provider.</li><li>This replaces most cross-service end-to-end tests, which are slow and flaky. Keep a thin set of smoke tests in a real environment.</li></ul>
+<p>Pair it with backward-compatible API evolution (add fields, do not remove) and consumer-aware deprecation.</p>
+</blockquote>
+<p class="q" id="T9"><strong><span class="qid">T9</span> What would a complete test strategy for a Spring Boot microservice look like? <span class="tag t-design">Design</span></strong></p>
+<blockquote>
+<div class="table-wrap"><table><thead><tr><th>Level</th><th>Tool</th><th>What it proves</th><th>Share</th></tr></thead><tbody><tr><td>Unit</td><td>JUnit 5, Mockito, AssertJ</td><td>Business rules in isolation</td><td>Most</td></tr><tr><td>Slice</td><td><code>@WebMvcTest</code>, <code>@DataJpaTest</code>, <code>@JsonTest</code></td><td>Layer wiring, queries, JSON, validation</td><td>Many</td></tr><tr><td>Integration</td><td><code>@SpringBootTest</code> + Testcontainers</td><td>Real DB, messaging, migrations, security together</td><td>Some</td></tr><tr><td>Contract</td><td>Spring Cloud Contract / Pact</td><td>API compatibility with consumers</td><td>Per integration</td></tr><tr><td>End to end</td><td>A few smoke tests in staging</td><td>Critical user journeys</td><td>Few</td></tr><tr><td>Non-functional</td><td>Gatling/k6, ArchUnit, mutation testing</td><td>Performance, architecture rules, test quality</td><td>As needed</td></tr></tbody></table></div>
+<p>Make the pipeline <strong>fast feedback first</strong>: unit and slice tests on every commit, integration and contract tests on every PR, performance and smoke tests before release. Treat flaky tests as bugs (quarantine, then fix), measure coverage on <strong>behavior</strong> (mutation score) rather than chasing a percentage, and keep test data builders and fixtures shared and small.</p>
+</blockquote>
+<footer class="foot">Answers target Spring Framework 6 and Spring Boot 3 (Java 17+). Verify version-specific details against the official reference documentation before an interview.</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script src="../../assets/script.js"></script>
+<script src="../../assets/qa.js"></script>
+</body>
+</html>
