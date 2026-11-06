@@ -32,6 +32,6 @@
         }
       });
     }, { rootMargin: "0px 0px -75% 0px" });
-    document.querySelectorAll(".content h1[id]").forEach(function (h) { io.observe(h); });
+    document.querySelectorAll(".content h1[id], .content h2[id]").forEach(function (h) { io.observe(h); });
   }
 })();

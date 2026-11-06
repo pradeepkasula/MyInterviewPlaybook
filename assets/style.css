@@ -78,3 +78,6 @@ body.practice-on p.q.open + blockquote { display: block; }
   .table-wrap, blockquote, p.q, img { break-inside: avoid; }
   body.practice-on p.q + blockquote { display: block; }
 }
+
+.back { display: inline-block; margin: 0 0 14px; font-size: 13px; font-weight: 600; color: var(--link); text-decoration: none; }
+.back:hover { text-decoration: underline; }

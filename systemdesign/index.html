@@ -1,0 +1,1891 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Design Interview Guide | My Interview Playbook</title>
+<meta name="description" content="System design interview guide with diagrams, questions and scenario answers.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="menu-btn" id="menuBtn" aria-label="Toggle contents" aria-expanded="false">Contents</button>
+<aside class="sidebar" id="sidebar">
+  <a class="back" href="../">&larr; All tracks</a>
+  <p class="side-title">Contents</p>
+  <nav>
+<a href="#contents">Contents</a>
+<a href="#part-b-system-design-interview-guide">How to use this guide</a>
+<a href="#topic-1-how-systems-are-measured">Topic 1: How Systems Are
+Measured</a>
+<a href="#topic-2-how-requests-travel">Topic 2: How Requests Travel</a>
+<a href="#topic-3-how-services-talk">Topic 3: How Services Talk</a>
+<a href="#topic-4-how-data-is-stored">Topic 4: How Data Is Stored</a>
+<a href="#topic-5-how-data-is-scaled">Topic 5: How Data Is Scaled</a>
+<a href="#topic-6-consistency-trade-offs">Topic 6: Consistency
+Trade-offs</a>
+<a href="#topic-7-coordination-during-failures">Topic 7: Coordination
+During Failures</a>
+<a href="#appendix-numbers-and-formulas-to-memorize">Appendix: numbers and
+formulas to memorize</a>
+<a href="#appendix-abbreviations-and-full-forms">Appendix: abbreviations
+and full forms</a>
+  
+  </nav>
+  <label class="practice"><input type="checkbox" id="practice"> Practice mode<span>Hide answers. Click a question to reveal its answer.</span></label>
+</aside>
+<main class="content">
+<header class="hero"><p class="eyebrow">Track: System Design</p><h1 class="doc-title">System Design Interview Guide</h1><p class="subtitle">Diagrams, questions and scenarios with answers</p><p class="intro">Seven topics in study order: how systems are measured, how requests travel, how services talk, how data is stored, how data is scaled, consistency trade-offs, and coordination during failures. Each topic has a table of what to know, a diagram, eight interview questions and three scenarios with model answers.</p></header>
+<h1 id="contents">Contents</h1>
+<p>Work through the topics in order, then use the appendices as a quick reference before an interview. Looking for company-specific preparation? See the <a href="../coupang/">Coupang prep catalog</a>.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 12%" />
+<col style="width: 37%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Group</strong></th>
+<th><strong>Section</strong></th>
+<th><strong>What it covers</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="even">
+<td><strong>Topics 1-7</strong></td>
+<td>Core system design topics</td>
+<td>How Systems Are Measured; How Requests Travel; How Services Talk;
+How Data Is Stored; How Data Is Scaled; Consistency Trade-offs;
+Coordination During Failures</td>
+</tr>
+<tr class="odd">
+<td><strong>Appendix</strong></td>
+<td>Numbers and formulas; abbreviations and full forms</td>
+<td>Quick reference at the end</td>
+</tr>
+</tbody>
+</table></div>
+<h1 id="part-b-system-design-interview-guide">How to use this guide</h1>
+<h2 id="how-to-use-this-part">How to use this part</h2>
+<p>Each topic follows the same layout so you can revise quickly: a short
+introduction, a table of everything you should know, a diagram, eight
+interview questions with model answers, and three scenario questions
+with model answers.</p>
+<ul>
+<li><p>First pass: read the 'What to know' table and the diagram. Be
+able to explain every row in two sentences.</p></li>
+<li><p>Second pass: cover the answers and respond to each question aloud
+in under two minutes, then compare.</p></li>
+<li><p>Third pass: for scenarios, structure your reply as clarify,
+estimate, design, trade-offs, failure modes.</p></li>
+<li><p>Answers are model answers. Adapt them with examples from your own
+systems; interviewers value real experience.</p></li>
+</ul>
+<h2 id="a-reusable-framework-for-any-design-question">A reusable
+framework for any design question</h2>
+<ol type="1">
+<li><p>Clarify requirements: users, features, read/write ratio, latency
+and availability targets, consistency needs.</p></li>
+<li><p>Estimate scale: QPS, storage, bandwidth, using round numbers and
+stating assumptions.</p></li>
+<li><p>Define the API and the data model, then pick storage by access
+pattern.</p></li>
+<li><p>Draw the high-level design: clients, edge, load balancer,
+services, cache, database, queue.</p></li>
+<li><p>Deep dive on the hardest component: partitioning, hot spots,
+consistency, failure handling.</p></li>
+<li><p>Discuss trade-offs and failure modes: what breaks at 10x, when a
+dependency is down, during a region outage.</p></li>
+<li><p>Close with monitoring, rollout and what you would build
+next.</p></li>
+</ol>
+<h1 id="topic-1-how-systems-are-measured">Topic 1: How Systems Are
+Measured</h1>
+<p>Every design starts with numbers. Before choosing components you need
+to know how fast the system must respond, how much traffic it carries,
+how much data it stores, and how often it may fail. These measurements
+let you justify every later decision.</p>
+<h2 id="what-to-know">What to know</h2>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 74%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Area</strong></th>
+<th><strong>Key points</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Latency</strong></td>
+<td>Time for one request. Use percentiles (p50, p95, p99), not averages,
+because the slow tail hurts real users. Tail latency compounds when one
+request fans out to many services.</td>
+</tr>
+<tr class="even">
+<td><strong>Throughput</strong></td>
+<td>Work done per second: QPS/RPS for reads and writes, TPS for
+transactions, MB/s for data. Peak is typically 2-5x average.</td>
+</tr>
+<tr class="odd">
+<td><strong>Availability and reliability</strong></td>
+<td>Uptime as a percentage (nines). Related terms: MTBF (time between
+failures), MTTR (time to recover), durability (data is not lost).</td>
+</tr>
+<tr class="even">
+<td><strong>SLI, SLO, SLA, error budget</strong></td>
+<td>SLI is the measurement, SLO the internal target, SLA the contractual
+promise with penalties. Error budget = 100% minus SLO, spent on releases
+and risk.</td>
+</tr>
+<tr class="odd">
+<td><strong>Capacity estimation</strong></td>
+<td>Back-of-envelope math for QPS, storage, bandwidth and memory. Round
+aggressively: 1 day is about 100,000 seconds, so 1M requests per day is
+about 12 QPS.</td>
+</tr>
+<tr class="even">
+<td><strong>Little's Law</strong></td>
+<td>L = lambda x W: concurrent requests = arrival rate x time in system.
+Sizes thread pools, connection pools and instance counts.</td>
+</tr>
+<tr class="odd">
+<td><strong>Scalability</strong></td>
+<td>Vertical (bigger machine) vs horizontal (more machines). Horizontal
+needs stateless services and partitioned data.</td>
+</tr>
+<tr class="even">
+<td><strong>Queuing and saturation</strong></td>
+<td>Latency rises sharply as utilization nears 100%. Keep headroom
+(60-70%) and use load shedding.</td>
+</tr>
+<tr class="odd">
+<td><strong>Observability</strong></td>
+<td>Metrics, logs and traces. RED method for services (Rate, Errors,
+Duration), USE method for resources (Utilization, Saturation,
+Errors).</td>
+</tr>
+<tr class="even">
+<td><strong>Load and capacity testing</strong></td>
+<td>Load, stress, soak and spike tests to find bottlenecks before
+production does.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="diagram">Diagram</h2>
+<p><img src="images/topic1-measuring-systems.png"
+title="How Systems Are Measured" loading="lazy"
+alt="Figure 1. Latency percentiles show the slow tail that the mean hides; each extra nine of availability cuts downtime by 10x." /></p>
+<p><em>Figure 1. Latency percentiles show the slow tail that the mean
+hides; each extra nine of availability cuts downtime by 10x.</em></p>
+<h2 id="interview-questions-and-model-answers">Interview questions and
+model answers</h2>
+<p class="q"><strong><span class="qid">Q1.1</span> Why use p99 latency instead of the average?</strong></p>
+<blockquote>
+<p>The average hides outliers. If 1% of requests take 3 seconds, a page
+making 50 backend calls will hit a slow one in about 40% of loads.
+Percentiles show what real users experience, and SLOs are normally set
+on p95 or p99.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q1.2</span> What is the availability of two 99.9% components in
+series, and in parallel?</strong></p>
+<blockquote>
+<p>In series you multiply: 0.999 x 0.999 = 99.8%. In parallel (either
+one is enough, independent failures) failure probabilities multiply: 1 -
+0.001 x 0.001 = 99.9999%. This is why redundancy raises availability and
+long dependency chains lower it.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q1.3</span> Explain SLI, SLO, SLA and error budget.</strong></p>
+<blockquote>
+<p>SLI is a measured indicator, for example the share of requests under
+300 ms. SLO is the target for it, for example 99.9% over 30 days. SLA is
+the external contract with penalties, usually looser than the SLO. The
+error budget is the allowed failure (0.1% here); when it is spent, teams
+freeze risky releases and focus on reliability.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q1.4</span> State Little's Law and use it.</strong></p>
+<blockquote>
+<p>L = lambda x W. With 1,000 requests per second and 200 ms average
+time in the system, about 200 requests are in flight at once. If each
+instance handles 50 concurrently, you need at least 4 instances, plus
+headroom.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q1.5</span> Vertical vs horizontal scaling: when would you choose
+each?</strong></p>
+<blockquote>
+<p>Vertical is simple and has no distribution cost, so it is right early
+on or for hard-to-shard stores, but it hits hardware limits and is a
+single point of failure. Horizontal gives near-unlimited scale and fault
+tolerance but needs stateless services, load balancing and partitioned
+data. Most systems do both: scale up first, design to scale out.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q1.6</span> Why does latency spike as a server approaches full
+utilization?</strong></p>
+<blockquote>
+<p>Queuing theory: waiting time grows non-linearly as utilization
+approaches 100%, because every request competes for the same resources.
+A server at 90% can have several times the latency of one at 60%. Keep
+headroom, add autoscaling, and shed or queue load when saturated.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q1.7</span> What are the RED and USE methods?</strong></p>
+<blockquote>
+<p>RED is for request-driven services: Rate, Errors, Duration. USE is
+for resources such as CPU, disks and pools: Utilization, Saturation,
+Errors. Together they let you move quickly from a symptom (slow
+checkout) to a cause (saturated DB connection pool).</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q1.8</span> How do you estimate storage for a new
+service?</strong></p>
+<blockquote>
+<p>Count records per day x size per record x retention x replication
+factor, then add index and growth overhead. Example: 20M writes per day
+x 1 KB = 20 GB per day, about 7.3 TB per year, about 22 TB with three
+replicas. State assumptions aloud and round.</p>
+</blockquote>
+<h2 id="scenario-based-questions-and-model-answers">Scenario-based
+questions and model answers</h2>
+<p class="q scn"><strong><span class="qid">S1.1</span> A service has 10M daily active users; each does 20 reads
+and 2 writes per day. Estimate QPS and storage.</strong></p>
+<blockquote>
+<p>Reads: 200M per day / 86,400 = about 2,300 QPS average, peak about
+7,000 (3x). Writes: 20M per day = about 230 QPS average, peak about 700.
+Storage at 1 KB per write is about 20 GB per day, 7.3 TB per year, about
+22 TB with 3 replicas. The read-heavy ratio (10:1) points to caching and
+read replicas.</p>
+</blockquote>
+<p class="q scn"><strong><span class="qid">S1.2</span> Checkout average latency is steady at 200 ms but p99
+jumped from 300 ms to 3 seconds. How do you investigate?</strong></p>
+<blockquote>
+<p>Look at distributed traces for the slowest requests to find which
+span grew. Check common tail causes: one slow dependency or node, GC
+pauses, lock contention, exhausted connection or thread pools, a cold
+cache, noisy neighbors, and retries. Mitigate with timeouts, hedged
+requests to a second replica, bulkheads and removing the bad node, then
+fix the root cause and add an alert on p99.</p>
+</blockquote>
+<p class="q scn"><strong><span class="qid">S1.3</span> The business wants 99.99% availability, but your request
+touches 5 services in series, each at 99.9%. What do you
+say?</strong></p>
+<blockquote>
+<p>Series availability is 0.999^5 = about 99.5% (roughly 1.8 days of
+downtime a year), far below 99.99%. Options: remove hard dependencies
+from the critical path (make calls async or optional), add redundancy
+across availability zones, cache or degrade gracefully when a dependency
+fails, and raise individual service targets. Also agree on what counts
+as 'available' with the business.</p>
+</blockquote>
+<h1 id="topic-2-how-requests-travel">Topic 2: How Requests Travel</h1>
+<p>A request crosses several layers before it reaches your code: name
+resolution, edge caching, load balancing, a gateway, then your services.
+Each layer is a chance to cut latency, absorb load or enforce policy,
+and each is also a place where things fail.</p>
+<h2 id="what-to-know-1">What to know</h2>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 74%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Area</strong></th>
+<th><strong>Key points</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>DNS</strong></td>
+<td>Resolves names to IPs through recursive resolvers and caches (TTL).
+Supports geo and latency-based routing and failover. Record types A,
+AAAA, CNAME, NS, TXT.</td>
+</tr>
+<tr class="even">
+<td><strong>CDN</strong></td>
+<td>Edge caches close to users for static and cacheable content. Pull vs
+push, cache keys, TTL, invalidation, origin shield, cache-control
+headers.</td>
+</tr>
+<tr class="odd">
+<td><strong>Load balancers</strong></td>
+<td>L4 (TCP/UDP, fast, no content awareness) vs L7 (HTTP, routing by
+path or header). Algorithms: round robin, weighted, least connections,
+consistent hashing. Health checks, sticky sessions, global load
+balancing, anycast.</td>
+</tr>
+<tr class="even">
+<td><strong>Reverse proxy and API gateway</strong></td>
+<td>Reverse proxy hides servers, terminates TLS, compresses and caches.
+Gateway adds authentication, rate limiting, routing, request
+transformation, versioning and aggregation.</td>
+</tr>
+<tr class="odd">
+<td><strong>Rate limiting</strong></td>
+<td>Token bucket, leaky bucket, fixed window, sliding window log and
+counter. Per user, IP or API key. Distributed limits need a shared store
+such as Redis.</td>
+</tr>
+<tr class="even">
+<td><strong>HTTP and TLS</strong></td>
+<td>HTTP/1.1 keep-alive, HTTP/2 multiplexing, HTTP/3 over QUIC. TLS
+handshake cost, session resumption, mutual TLS between services.</td>
+</tr>
+<tr class="odd">
+<td><strong>Authentication and sessions</strong></td>
+<td>Cookies and server sessions vs JWT, OAuth2 and OIDC flows, token
+expiry and revocation.</td>
+</tr>
+<tr class="even">
+<td><strong>Real-time channels</strong></td>
+<td>Polling, long polling, Server-Sent Events, WebSockets. Choose by
+direction of data and connection cost.</td>
+</tr>
+<tr class="odd">
+<td><strong>Service discovery</strong></td>
+<td>Client-side vs server-side discovery with Eureka, Consul or
+Kubernetes DNS; ingress controllers and service mesh sidecars.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="diagram-1">Diagram</h2>
+<p><img src="images/topic2-request-path.png"
+title="How Requests Travel" loading="lazy"
+alt="Figure 2. A request path from client to data, with the cache checked before the database." /></p>
+<p><em>Figure 2. A request path from client to data, with the cache
+checked before the database.</em></p>
+<h2 id="interview-questions-and-model-answers-1">Interview questions and
+model answers</h2>
+<p class="q"><strong><span class="qid">Q2.1</span> What happens when you type a URL and press
+Enter?</strong></p>
+<blockquote>
+<p>The browser checks its caches, then DNS resolves the host to an IP
+(possibly a CDN edge via geo-DNS). It opens a TCP connection and a TLS
+handshake. The request hits the CDN, which answers if cached, otherwise
+a load balancer picks a healthy server behind it. The gateway
+authenticates and rate limits, a service handles the request using cache
+and database, and the response returns along the same path while the
+browser renders it.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q2.2</span> L4 vs L7 load balancing?</strong></p>
+<blockquote>
+<p>L4 balances on IP and port without reading the payload, so it is very
+fast and protocol-agnostic. L7 understands HTTP, so it can route by
+path, header or cookie, terminate TLS, retry and do canary releases, at
+higher cost per request. Many systems use L4 at the front and L7 behind
+it.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q2.3</span> Compare round robin, least connections and consistent
+hashing.</strong></p>
+<blockquote>
+<p>Round robin is simple and fair when requests cost the same. Least
+connections adapts to uneven or long-lived requests. Consistent hashing
+sends the same key (user, session, cache key) to the same server, which
+gives cache locality and minimal remapping when servers join or
+leave.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q2.4</span> Reverse proxy vs load balancer vs API
+gateway?</strong></p>
+<blockquote>
+<p>A load balancer spreads traffic across instances. A reverse proxy
+sits in front of servers and can also cache, compress and terminate TLS.
+An API gateway is a smart L7 proxy for APIs that adds authentication,
+rate limiting, routing, versioning and sometimes aggregation. In
+practice one product (Nginx, Envoy, Kong) can play several roles.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q2.5</span> How does a token bucket rate limiter work, and how do
+you make it distributed?</strong></p>
+<blockquote>
+<p>A bucket holds up to N tokens and refills at R per second; each
+request takes a token and is rejected when empty. This allows bursts up
+to N with an average rate R. For many servers, keep the counters in
+Redis and update them atomically with a Lua script (or INCR plus EXPIRE
+for window counters), accepting a small network cost, or use local
+limits with periodic sync for lower latency.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q2.6</span> How do CDNs handle updates to cached
+content?</strong></p>
+<blockquote>
+<p>Set cache-control TTLs, version file names (app.v123.js) so new
+content gets a new URL, and use explicit purge APIs for urgent changes.
+Pull CDNs fetch from the origin on a miss; push CDNs are uploaded ahead
+of time. An origin shield reduces load on the origin by funneling misses
+through one tier.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q2.7</span> JWT vs server-side sessions?</strong></p>
+<blockquote>
+<p>JWTs are stateless and scale easily because any service can verify
+the signature, but they are hard to revoke before expiry and can grow
+large, so use short lifetimes plus refresh tokens. Server sessions are
+easy to revoke and small on the wire but need a shared session store
+(Redis) and lookups. Sensitive systems often combine short-lived tokens
+with a revocation list.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q2.8</span> How does a load balancer know a server is
+unhealthy?</strong></p>
+<blockquote>
+<p>Active health checks call an endpoint (for example /health) at
+intervals and remove a server after consecutive failures. Passive checks
+watch real traffic for errors or timeouts and eject outliers. A good
+health endpoint checks dependencies it truly needs, but not so deeply
+that one shared dependency failure takes the whole fleet out.</p>
+</blockquote>
+<h2 id="scenario-based-questions-and-model-answers-1">Scenario-based
+questions and model answers</h2>
+<p class="q scn"><strong><span class="qid">S2.1</span> A flash sale will send 50x normal traffic to your
+product pages. Design the edge.</strong></p>
+<blockquote>
+<p>Serve images, scripts and cacheable product pages from the CDN with
+short TTLs. Put a rate limiter and bot protection at the gateway, add a
+virtual waiting room or queue for checkout so the backend sees a
+controlled rate, pre-scale instances ahead of time (autoscaling reacts
+too slowly), warm caches, and have load shedding that returns a friendly
+'try again' for non-critical features. Load test at 1.5x the expected
+peak beforehand.</p>
+</blockquote>
+<p class="q scn"><strong><span class="qid">S2.2</span> Users in India and Korea report slow responses from a
+single-region deployment. What do you do?</strong></p>
+<blockquote>
+<p>Measure per-region latency first. Use geo or latency-based DNS to
+route users to the nearest region, a CDN for static and cacheable
+content, and TLS session reuse. For dynamic data, deploy services in
+each region with local read replicas, keep writes in a home region (or
+shard by user region), and decide how much cross-region consistency you
+can accept.</p>
+</blockquote>
+<p class="q scn"><strong><span class="qid">S2.3</span> Your load balancer uses round robin, yet one server is
+at 95% CPU while others are at 40%. Why, and how do you fix
+it?</strong></p>
+<blockquote>
+<p>Likely causes: sticky sessions pinning heavy users, long-lived
+connections (WebSockets, gRPC streams) that are not rebalanced, requests
+of very different cost, a hot key under consistent hashing, or a slow
+node. Switch to least connections or weighted balancing, remove
+stickiness by externalizing session state, rebalance or recycle long
+connections, and split heavy endpoints or tenants.</p>
+</blockquote>
+<h1 id="topic-3-how-services-talk">Topic 3: How Services Talk</h1>
+<p>Services communicate synchronously (the caller waits) or
+asynchronously (the caller hands off a message). Synchronous calls are
+simple but couple availability; messaging decouples services and absorbs
+spikes but adds eventual consistency and operational complexity.</p>
+<h2 id="what-to-know-2">What to know</h2>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 74%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Area</strong></th>
+<th><strong>Key points</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>API styles</strong></td>
+<td>REST (resource-oriented, cacheable), gRPC (Protobuf, HTTP/2,
+streaming, strict contracts), GraphQL (client-shaped queries, N+1
+risks), WebSocket for push.</td>
+</tr>
+<tr class="even">
+<td><strong>API design</strong></td>
+<td>Idempotency keys, versioning, pagination (offset vs cursor), error
+codes, backward-compatible changes, rate limits.</td>
+</tr>
+<tr class="odd">
+<td><strong>Resilience patterns</strong></td>
+<td>Timeouts, retries with exponential backoff and jitter, retry
+budgets, circuit breaker, bulkhead, fallback, hedged requests.</td>
+</tr>
+<tr class="even">
+<td><strong>Messaging models</strong></td>
+<td>Point-to-point queues, publish-subscribe, and log-based streams.
+RabbitMQ and SQS (queues) vs Kafka (replayable log).</td>
+</tr>
+<tr class="odd">
+<td><strong>Kafka essentials</strong></td>
+<td>Topics, partitions, offsets, consumer groups, replication and
+in-sync replicas, acks=all, retention, compaction, rebalancing, consumer
+lag.</td>
+</tr>
+<tr class="even">
+<td><strong>Delivery semantics</strong></td>
+<td>At-most-once, at-least-once, exactly-once (in practice idempotent
+consumers plus transactional writes). Ordering holds per partition.</td>
+</tr>
+<tr class="odd">
+<td><strong>Event-driven patterns</strong></td>
+<td>Outbox, saga, CQRS, event sourcing, change data capture (CDC),
+dead-letter queues.</td>
+</tr>
+<tr class="even">
+<td><strong>Flow control</strong></td>
+<td>Backpressure, bounded queues, consumer scaling, rate limiting, load
+shedding.</td>
+</tr>
+<tr class="odd">
+<td><strong>Serialization and contracts</strong></td>
+<td>JSON vs Protobuf vs Avro, schema registry, forward and backward
+compatibility.</td>
+</tr>
+<tr class="even">
+<td><strong>Service mesh</strong></td>
+<td>Sidecar proxies for mTLS, retries, traffic shifting and
+observability (Istio, Linkerd).</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="diagram-2">Diagram</h2>
+<p><img src="images/topic3-service-communication.png"
+title="How Services Talk" loading="lazy"
+alt="Figure 3. Synchronous request/response with resilience controls versus asynchronous Kafka messaging with consumer groups and a dead-letter queue." /></p>
+<p><em>Figure 3. Synchronous request/response with resilience controls
+versus asynchronous Kafka messaging with consumer groups and a
+dead-letter queue.</em></p>
+<h2 id="interview-questions-and-model-answers-2">Interview questions and
+model answers</h2>
+<p class="q"><strong><span class="qid">Q3.1</span> REST vs gRPC vs GraphQL: when would you use
+each?</strong></p>
+<blockquote>
+<p>REST for public, cacheable, resource-style APIs with broad tooling.
+gRPC for internal service-to-service calls where performance, streaming
+and strict typed contracts matter. GraphQL when many different clients
+need to shape their own responses and you want to avoid over- and
+under-fetching, with care for N+1 queries and query cost limits.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q3.2</span> How do you make a POST request safe to
+retry?</strong></p>
+<blockquote>
+<p>Make it idempotent. The client sends a unique idempotency key; the
+server stores the key with the result (atomically with the work) and
+returns the saved result for any repeat. Natural keys and unique
+constraints in the database give the same protection for writes.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q3.3</span> What can go wrong with retries and how do you control
+it?</strong></p>
+<blockquote>
+<p>Naive retries cause retry storms that overload a recovering service,
+and they duplicate non-idempotent work. Use exponential backoff with
+jitter, a retry budget (for example at most 10% extra traffic), retry
+only on safe or idempotent errors, set timeouts shorter than the
+caller's, and retry at one layer only.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q3.4</span> Explain the circuit breaker pattern.</strong></p>
+<blockquote>
+<p>It has three states. Closed: calls flow and failures are counted.
+Open: after a failure threshold, calls fail immediately (or return a
+fallback) so the dependency can recover and callers do not pile up.
+Half-open: after a cooldown a few trial calls test recovery; success
+closes the breaker, failure reopens it. In Spring this is commonly
+Resilience4j.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q3.5</span> Queue vs pub-sub vs log (Kafka vs
+RabbitMQ)?</strong></p>
+<blockquote>
+<p>A queue delivers each message to one consumer and removes it, good
+for task distribution. Pub-sub delivers each message to every
+subscriber. Kafka is a partitioned, replicated, retained log: consumers
+track offsets, can replay history and scale in groups, giving high
+throughput and ordering per partition. RabbitMQ offers richer routing
+and per-message acknowledgements at lower scale.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q3.6</span> How does Kafka guarantee ordering and what breaks
+it?</strong></p>
+<blockquote>
+<p>Order is guaranteed only within a partition. Use a key (for example
+order id) so related events go to the same partition. Ordering can break
+with multiple partitions for one entity, producer retries without
+idempotence, or parallel processing inside one consumer. More partitions
+raise parallelism but not global order.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q3.7</span> Can you get exactly-once delivery?</strong></p>
+<blockquote>
+<p>Not across arbitrary systems; networks make 'exactly once' delivery
+impossible in general. You get exactly-once effects by combining
+at-least-once delivery with idempotent processing (dedup by message id
+or a unique constraint), or by using Kafka's idempotent producer and
+transactions for Kafka-to-Kafka flows.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q3.8</span> What is the outbox pattern and why use it?</strong></p>
+<blockquote>
+<p>A service must update its database and publish an event without
+losing one of them. Write the event to an outbox table in the same local
+transaction as the data change; a separate relay (polling or CDC)
+publishes it to the broker and marks it sent. This avoids dual-write
+inconsistency; consumers must be idempotent because publishing is
+at-least-once.</p>
+</blockquote>
+<h2 id="scenario-based-questions-and-model-answers-2">Scenario-based
+questions and model answers</h2>
+<p class="q scn"><strong><span class="qid">S3.1</span> The payment succeeded, but the order service timed out
+waiting for the response. How do you avoid charging twice?</strong></p>
+<blockquote>
+<p>Send an idempotency key with the payment request so a retry returns
+the original result instead of charging again. On timeout, do not assume
+failure: query the payment status by key (or wait for the payment
+event), then confirm or cancel the order. Add a reconciliation job to
+catch orders and payments that disagree.</p>
+</blockquote>
+<p class="q scn"><strong><span class="qid">S3.2</span> During a sale, a Kafka consumer's lag keeps growing.
+What do you check and do?</strong></p>
+<blockquote>
+<p>Check whether processing is slow (downstream DB or API latency),
+whether partitions are fewer than consumers (extra consumers sit idle),
+whether one hot partition is overloaded due to a skewed key, whether a
+poison message is blocking progress, and whether rebalances are
+happening. Fix by optimizing or batching processing, adding partitions
+and consumers, changing the key, moving bad messages to a dead-letter
+queue, and alerting on lag.</p>
+</blockquote>
+<p class="q scn"><strong><span class="qid">S3.3</span> Service A calls Service B synchronously; B is slow, and
+soon A and its callers also fail. How do you stop the
+cascade?</strong></p>
+<blockquote>
+<p>Set tight timeouts and bounded thread or connection pools per
+dependency (bulkheads) so one slow call cannot exhaust everything. Add a
+circuit breaker with a fallback (cached or default data), limit retries
+with backoff and jitter, and shed load. Where the business allows, make
+the call asynchronous through a queue so A no longer depends on B being
+up.</p>
+</blockquote>
+<h1 id="topic-4-how-data-is-stored">Topic 4: How Data Is Stored</h1>
+<p>Storage choices follow access patterns: how data is read, written,
+queried and how consistent it must be. Know what each family of
+databases is good at, how indexes and storage engines work, and how
+caches sit in front.</p>
+<h2 id="what-to-know-3">What to know</h2>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 74%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Area</strong></th>
+<th><strong>Key points</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Relational databases</strong></td>
+<td>Tables, joins, constraints, normalization. ACID transactions.
+PostgreSQL and MySQL internals: MVCC, write-ahead log, locks,
+vacuum.</td>
+</tr>
+<tr class="even">
+<td><strong>Indexes</strong></td>
+<td>B-tree, hash, composite (leftmost prefix), covering, partial,
+unique. Reading EXPLAIN plans, index selectivity, why indexes slow
+writes.</td>
+</tr>
+<tr class="odd">
+<td><strong>Transactions and isolation</strong></td>
+<td>Read uncommitted, read committed, repeatable read, serializable;
+anomalies: dirty read, non-repeatable read, phantom, write skew, lost
+update. Optimistic vs pessimistic locking, deadlocks.</td>
+</tr>
+<tr class="even">
+<td><strong>Storage engines</strong></td>
+<td>B-tree (read-optimized, in-place updates) vs LSM tree
+(write-optimized, memtable, SSTables, compaction, bloom filters).</td>
+</tr>
+<tr class="odd">
+<td><strong>NoSQL families</strong></td>
+<td>Key-value (DynamoDB, Redis), document (MongoDB), wide-column
+(Cassandra, HBase), graph (Neo4j), search (Elasticsearch, inverted
+index), time series.</td>
+</tr>
+<tr class="even">
+<td><strong>Data modeling</strong></td>
+<td>Model by access pattern for NoSQL; normalize for SQL; denormalize
+deliberately for reads; single-table design in DynamoDB.</td>
+</tr>
+<tr class="odd">
+<td><strong>Caching</strong></td>
+<td>Cache-aside, read-through, write-through, write-back, write-around;
+LRU, LFU, TTL; stampede, penetration, avalanche, hot key; Redis data
+structures and persistence.</td>
+</tr>
+<tr class="even">
+<td><strong>Object and blob storage</strong></td>
+<td>S3-style stores for files, immutable objects, lifecycle and tiering,
+pre-signed URLs, CDN in front.</td>
+</tr>
+<tr class="odd">
+<td><strong>Operations</strong></td>
+<td>Schema migrations without downtime, backups, point-in-time recovery,
+connection pooling, polyglot persistence.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="diagram-3">Diagram</h2>
+<p><img src="images/topic4-data-storage.png"
+title="How Data Is Stored" loading="lazy"
+alt="Figure 4. Storage families by access pattern, and the cache-aside read path." /></p>
+<p><em>Figure 4. Storage families by access pattern, and the cache-aside
+read path.</em></p>
+<h2 id="interview-questions-and-model-answers-3">Interview questions and
+model answers</h2>
+<p class="q"><strong><span class="qid">Q4.1</span> Explain ACID.</strong></p>
+<blockquote>
+<p>Atomicity: a transaction applies fully or not at all. Consistency: it
+moves the database from one valid state to another, respecting
+constraints. Isolation: concurrent transactions do not see each other's
+partial work (to a chosen degree). Durability: committed data survives
+crashes, usually via a write-ahead log flushed to disk.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q4.2</span> Describe the isolation levels and the anomalies they
+prevent.</strong></p>
+<blockquote>
+<p>Read committed prevents dirty reads. Repeatable read also prevents
+non-repeatable reads (PostgreSQL implements it as snapshot isolation,
+which still allows write skew). Serializable prevents all anomalies,
+including phantoms and write skew, at the cost of aborts or locking.
+PostgreSQL defaults to read committed, MySQL InnoDB to repeatable
+read.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q4.3</span> How does a B-tree index work, and when is an index not
+used?</strong></p>
+<blockquote>
+<p>A B-tree keeps keys sorted in a balanced, shallow tree, so lookups,
+range scans and ordered reads take O(log n) page reads. A composite
+index (a, b, c) serves queries on a, a+b and a+b+c (leftmost prefix) but
+not b alone. It may be skipped when a function wraps the column, the
+type is mismatched, the predicate is not selective, a leading wildcard
+LIKE is used, or the planner estimates a scan is cheaper.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q4.4</span> B-tree vs LSM tree?</strong></p>
+<blockquote>
+<p>B-trees update pages in place, giving predictable reads and good
+read-heavy performance (PostgreSQL, MySQL). LSM trees buffer writes in
+memory, flush sorted immutable files and compact them in the background,
+giving very high write throughput with more read and space amplification
+(Cassandra, RocksDB, HBase). Bloom filters reduce LSM read cost.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q4.5</span> SQL vs NoSQL: how do you choose?</strong></p>
+<blockquote>
+<p>Choose SQL when you need transactions, joins, flexible ad-hoc queries
+and strong consistency, which covers most business data. Choose NoSQL
+when the access pattern is known and simple, scale or write volume
+exceeds one node, the schema varies, or latency at huge scale matters.
+You often use both (polyglot persistence).</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q4.6</span> What are cache stampede, penetration and
+avalanche?</strong></p>
+<blockquote>
+<p>Stampede: a hot key expires and many requests hit the database at
+once; fix with request coalescing or locks, early refresh and jittered
+TTLs. Penetration: requests for keys that do not exist always miss; fix
+with negative caching or a Bloom filter. Avalanche: many keys expire
+together or the cache fails; fix with random TTLs, replication and
+fallback limits.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q4.7</span> How do you keep cache and database
+consistent?</strong></p>
+<blockquote>
+<p>Use cache-aside with deletion (not update) of the key after a
+successful database write, short TTLs as a safety net, and versioned
+values where needed. For stronger needs, subscribe to the database
+change stream (CDC) to invalidate. Accept that a brief stale window
+exists, and avoid caching data that must be strongly consistent.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q4.8</span> How do you design DynamoDB partition keys, and what is a
+hot partition?</strong></p>
+<blockquote>
+<p>Pick a high-cardinality key that spreads traffic evenly and matches
+the main access pattern (for example customer_id, with a sort key for
+ordering). A hot partition receives disproportionate traffic and gets
+throttled. Mitigate by adding a suffix or shard number to hot keys,
+caching hot reads, and avoiding monotonically increasing keys like
+timestamps.</p>
+</blockquote>
+<h2 id="scenario-based-questions-and-model-answers-3">Scenario-based
+questions and model answers</h2>
+<p class="q scn"><strong><span class="qid">S4.1</span> A query on a 500M-row orders table now takes 10 seconds.
+How do you fix it?</strong></p>
+<blockquote>
+<p>Run EXPLAIN ANALYZE to see the plan. Add or reshape an index matching
+the filter and sort (a composite or covering index), replace OFFSET
+pagination with keyset pagination, select only needed columns, update
+statistics and check for bloat. If the table keeps growing, partition by
+date, archive cold data, and offload reporting to a replica or analytics
+store.</p>
+</blockquote>
+<p class="q scn"><strong><span class="qid">S4.2</span> 5,000 buyers try to purchase the last 10 units at once.
+How do you prevent overselling?</strong></p>
+<blockquote>
+<p>Make the decrement atomic in the source of truth: UPDATE inventory
+SET stock = stock - 1 WHERE sku = ? AND stock &gt; 0, and treat zero
+rows updated as sold out. Alternatives are SELECT ... FOR UPDATE,
+optimistic locking with a version column, or a Redis DECR gate in front
+with reconciliation to the database. Add a short-lived reservation with
+TTL during checkout and an idempotent order creation.</p>
+</blockquote>
+<p class="q scn"><strong><span class="qid">S4.3</span> A product page is 95% reads and database CPU is at 90%.
+What do you do?</strong></p>
+<blockquote>
+<p>Add a cache-aside layer in Redis for product data with jittered TTLs,
+handle the hot-key problem with request coalescing or a local in-process
+cache, push static fragments and images to the CDN, and add read
+replicas for the remaining queries. Measure hit ratio, and invalidate on
+updates through events or CDC.</p>
+</blockquote>
+<h1 id="topic-5-how-data-is-scaled">Topic 5: How Data Is Scaled</h1>
+<p>When one machine can no longer hold the data or serve the traffic,
+you copy it (replication) for reads and availability, or split it
+(sharding) for capacity and write throughput. Both introduce new failure
+modes and consistency questions.</p>
+<h2 id="what-to-know-4">What to know</h2>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 74%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Area</strong></th>
+<th><strong>Key points</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Replication models</strong></td>
+<td>Leader-follower (single leader), multi-leader, leaderless
+(Dynamo-style). Synchronous, asynchronous and semi-synchronous
+replication.</td>
+</tr>
+<tr class="even">
+<td><strong>Replication lag</strong></td>
+<td>Stale reads, read-your-writes, monotonic reads; routing reads to the
+leader or by session token or log position.</td>
+</tr>
+<tr class="odd">
+<td><strong>Failover</strong></td>
+<td>Detecting leader failure, promoting a follower, avoiding split
+brain, losing unreplicated writes.</td>
+</tr>
+<tr class="even">
+<td><strong>Quorums</strong></td>
+<td>N replicas, write quorum W, read quorum R; W + R &gt; N gives
+overlap. Sloppy quorums and hinted handoff.</td>
+</tr>
+<tr class="odd">
+<td><strong>Sharding strategies</strong></td>
+<td>Range, hash, directory (lookup), geographic, and composite keys.
+Trade-offs: range scans vs even distribution.</td>
+</tr>
+<tr class="even">
+<td><strong>Consistent hashing</strong></td>
+<td>Ring with virtual nodes; adding or removing a node moves only about
+1/N of keys.</td>
+</tr>
+<tr class="odd">
+<td><strong>Shard key choice</strong></td>
+<td>High cardinality, even distribution, matches query pattern, avoids
+monotonic keys; hot keys and skew.</td>
+</tr>
+<tr class="even">
+<td><strong>Cross-shard operations</strong></td>
+<td>Scatter-gather queries, global secondary indexes, distributed
+transactions, avoiding cross-shard joins by design.</td>
+</tr>
+<tr class="odd">
+<td><strong>Resharding</strong></td>
+<td>Online rebalancing, double writes, shadow reads, fixed number of
+logical shards mapped to physical nodes.</td>
+</tr>
+<tr class="even">
+<td><strong>Read and write scaling</strong></td>
+<td>Read replicas, caches, CQRS, materialized views; batching, queues,
+LSM-based stores, table partitioning.</td>
+</tr>
+<tr class="odd">
+<td><strong>ID generation</strong></td>
+<td>UUID, database sequences, Snowflake-style time-ordered IDs, ticket
+servers.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="diagram-4">Diagram</h2>
+<p><img src="images/topic5-scaling-data.png"
+title="How Data Is Scaled" loading="lazy"
+alt="Figure 5. Leader-follower replication scales reads; hash sharding spreads data and writes across shards." /></p>
+<p><em>Figure 5. Leader-follower replication scales reads; hash sharding
+spreads data and writes across shards.</em></p>
+<h2 id="interview-questions-and-model-answers-4">Interview questions and
+model answers</h2>
+<p class="q"><strong><span class="qid">Q5.1</span> Replication vs sharding: what problem does each
+solve?</strong></p>
+<blockquote>
+<p>Replication keeps copies of the same data on several nodes: it
+improves read throughput, availability and durability but not write
+capacity or total data size. Sharding splits different data across
+nodes: it scales storage and writes but each shard is still a single
+point of failure unless replicated. Large systems shard and replicate
+each shard.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q5.2</span> Synchronous vs asynchronous replication?</strong></p>
+<blockquote>
+<p>Synchronous replication waits for follower acknowledgement before
+confirming a write, so no committed data is lost on failover, but
+latency rises and one slow follower can block writes. Asynchronous is
+fast and available but can lose recent writes if the leader dies and
+followers lag. Semi-synchronous (one sync follower, the rest async) is a
+common compromise.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q5.3</span> Explain quorum reads and writes.</strong></p>
+<blockquote>
+<p>With N replicas, a write succeeds after W acknowledgements and a read
+queries R replicas. If W + R &gt; N, every read overlaps with the latest
+successful write, giving strong-ish consistency (for example N=3, W=2,
+R=2). Lowering W or R improves latency and availability at the cost of
+staleness.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q5.4</span> What is consistent hashing and why use virtual
+nodes?</strong></p>
+<blockquote>
+<p>Keys and nodes are hashed onto a ring; a key belongs to the next node
+clockwise. Adding or removing a node only remaps the keys next to it
+(about 1/N), unlike hash(key) mod N, which remaps almost everything.
+Virtual nodes give each physical node many ring positions, which evens
+out load and lets stronger machines take more.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q5.5</span> Range sharding vs hash sharding?</strong></p>
+<blockquote>
+<p>Range sharding keeps adjacent keys together, so range scans are
+efficient, but sequential keys create hot shards. Hash sharding
+distributes keys evenly, which balances load, but range queries must hit
+every shard. Many systems hash a prefix and sort within it (for example
+DynamoDB partition and sort keys).</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q5.6</span> How do you choose a shard key?</strong></p>
+<blockquote>
+<p>Look at the dominant query pattern and choose a key that keeps most
+queries on one shard (for example customer_id or tenant_id). It should
+have high cardinality, spread load evenly, and not be monotonic.
+Consider future growth and the cost of changing it, which is high.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q5.7</span> How do you handle cross-shard queries and
+transactions?</strong></p>
+<blockquote>
+<p>Prefer designing so they are rare: co-locate related data under the
+same key. For queries, use scatter-gather with a coordinator, global
+secondary indexes, or a separate search or analytics store. For
+transactions, use sagas with compensations, or two-phase commit only
+where unavoidable and the shards are few.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q5.8</span> How do you generate unique IDs across
+shards?</strong></p>
+<blockquote>
+<p>Options: UUIDs (no coordination, but large and unordered), database
+sequences per shard with offsets, ticket servers, and Snowflake-style
+IDs combining timestamp, machine id and sequence number, which are
+roughly time-ordered and index-friendly. Watch for clock skew and
+machine id assignment.</p>
+</blockquote>
+<h2 id="scenario-based-questions-and-model-answers-4">Scenario-based
+questions and model answers</h2>
+<p class="q scn"><strong><span class="qid">S5.1</span> A single PostgreSQL primary is hitting its write limit
+at 20,000 writes per second. What is your plan?</strong></p>
+<blockquote>
+<p>First remove waste: batch inserts, drop unused indexes, tune
+checkpoints and connection pooling, move reads to replicas, and queue
+bursty writes. Then scale up the primary. If that is not enough,
+partition large tables and shard by a key such as customer_id behind a
+routing layer, with a fixed number of logical shards mapped to physical
+nodes so you can rebalance later. Migrate with double writes and
+verification.</p>
+</blockquote>
+<p class="q scn"><strong><span class="qid">S5.2</span> One very large seller's shard is overloaded while the
+others are idle. What do you do?</strong></p>
+<blockquote>
+<p>Confirm it is key skew. Options: give the hot tenant its own shard,
+split their key space with a salt or suffix so writes spread (and merge
+on read), cache their hot reads, and rate limit or queue their writes.
+Longer term use finer-grained shards and automatic rebalancing.</p>
+</blockquote>
+<p class="q scn"><strong><span class="qid">S5.3</span> Users post a comment, refresh, and it is missing. Why,
+and how do you fix it?</strong></p>
+<blockquote>
+<p>Reads went to an asynchronous replica that had not yet applied the
+write (replication lag). Provide read-your-writes: send a user's reads
+to the leader for a few seconds after they write, or track the write's
+log position or timestamp in a session token and only read from replicas
+that have caught up. Also monitor replica lag and fail over reads when
+it is high.</p>
+</blockquote>
+<h1 id="topic-6-consistency-trade-offs">Topic 6: Consistency
+Trade-offs</h1>
+<p>Once data lives on several machines, you must decide how up to date
+and how ordered each read must be, and what to sacrifice for speed and
+availability. The skill is choosing the weakest consistency that keeps
+the business correct.</p>
+<h2 id="what-to-know-5">What to know</h2>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 74%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Area</strong></th>
+<th><strong>Key points</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>CAP theorem</strong></td>
+<td>During a network partition a system must choose consistency (reject
+or delay some requests) or availability (answer, possibly stale).
+Partition tolerance is not optional.</td>
+</tr>
+<tr class="even">
+<td><strong>PACELC</strong></td>
+<td>If Partition: choose Availability or Consistency; Else: choose
+Latency or Consistency. Explains why even healthy systems trade
+consistency for speed.</td>
+</tr>
+<tr class="odd">
+<td><strong>Consistency models</strong></td>
+<td>Linearizable (strong), sequential, causal, read-your-writes,
+monotonic reads, eventual.</td>
+</tr>
+<tr class="even">
+<td><strong>ACID vs BASE</strong></td>
+<td>ACID transactions on one node vs Basically Available, Soft state,
+Eventually consistent designs.</td>
+</tr>
+<tr class="odd">
+<td><strong>Distributed transactions</strong></td>
+<td>Two-phase commit (blocking, coordinator failure), three-phase
+commit, Saga (orchestration or choreography), TCC, outbox.</td>
+</tr>
+<tr class="even">
+<td><strong>Idempotency and deduplication</strong></td>
+<td>Required for safe retries; unique keys, versions, sequence
+numbers.</td>
+</tr>
+<tr class="odd">
+<td><strong>Conflict resolution</strong></td>
+<td>Last-write-wins, version vectors, CRDTs, application-level merge,
+single-writer designs.</td>
+</tr>
+<tr class="even">
+<td><strong>Anti-entropy</strong></td>
+<td>Read repair, hinted handoff, Merkle-tree comparison, gossip.</td>
+</tr>
+<tr class="odd">
+<td><strong>Event sourcing and CQRS</strong></td>
+<td>Store events as the source of truth; separate read and write models
+with eventual consistency between them.</td>
+</tr>
+<tr class="even">
+<td><strong>Time and ordering</strong></td>
+<td>Wall-clock skew, Lamport clocks, vector clocks, hybrid logical
+clocks, TrueTime.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="diagram-5">Diagram</h2>
+<p><img src="images/topic6-consistency.png"
+title="Consistency Trade-offs" loading="lazy"
+alt="Figure 6. CAP triangle, the consistency spectrum from strong to eventual, and the two ways to coordinate distributed transactions." /></p>
+<p><em>Figure 6. CAP triangle, the consistency spectrum from strong to
+eventual, and the two ways to coordinate distributed
+transactions.</em></p>
+<h2 id="interview-questions-and-model-answers-5">Interview questions and
+model answers</h2>
+<p class="q"><strong><span class="qid">Q6.1</span> Explain CAP precisely. What is the common
+misconception?</strong></p>
+<blockquote>
+<p>CAP says that when a network partition occurs, a replicated system
+can either stay consistent (linearizable) by refusing some requests, or
+stay available by answering from possibly stale data; it cannot do both.
+The misconception is 'pick any two of three': partitions are a fact of
+networks, so the real choice is C or A during a partition, and CAP says
+nothing about normal operation.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q6.2</span> What does PACELC add?</strong></p>
+<blockquote>
+<p>It extends CAP to the no-partition case: Else, you still trade
+latency against consistency, because strong consistency requires
+coordination between replicas. For example Dynamo-style stores are PA/EL
+(available and fast, eventually consistent), while a strongly consistent
+store such as Spanner is PC/EC.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q6.3</span> Linearizable vs eventual consistency: give examples of
+where each is needed.</strong></p>
+<blockquote>
+<p>Linearizable means every read sees the latest completed write as if
+there were one copy; it is needed for locks, leader election, unique
+usernames, account balances and inventory decrement at checkout.
+Eventual consistency means replicas converge if writes stop; it suits
+social feeds, like counts, product view counts, recommendations and
+catalog displays.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q6.4</span> In an e-commerce system, which data needs strong
+consistency and which can be eventual?</strong></p>
+<blockquote>
+<p>Strong: payments and ledgers, stock decrement at the moment of
+purchase, order state transitions, coupon redemption. Eventual: product
+catalog and search index, displayed stock count (with a final check at
+checkout), reviews, recommendations, analytics. Design the boundary
+explicitly and reconcile where they meet.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q6.5</span> Why is two-phase commit problematic, and what replaces
+it?</strong></p>
+<blockquote>
+<p>2PC blocks: if the coordinator crashes after participants vote yes,
+they hold locks until it recovers, which hurts availability and latency,
+and it couples services tightly. Microservices usually use sagas: a
+sequence of local transactions with compensating actions on failure,
+plus idempotent steps and the outbox pattern.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q6.6</span> Saga orchestration vs choreography?</strong></p>
+<blockquote>
+<p>Orchestration uses a central coordinator that tells each service what
+to do and handles failures, which gives clear flow and easier monitoring
+but a central component. Choreography has services react to each other's
+events with no coordinator, which is loosely coupled but harder to
+follow and debug as the flow grows. Choose orchestration for complex
+flows.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q6.7</span> How are conflicts resolved when two replicas accept
+writes?</strong></p>
+<blockquote>
+<p>Last-write-wins is simple but silently drops updates and depends on
+clocks. Version vectors detect concurrent writes so the application can
+merge them. CRDTs (counters, sets, registers) merge automatically and
+converge without coordination. Another approach is to avoid conflicts by
+assigning a single writer per record (for example by user home
+region).</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q6.8</span> What are read repair, hinted handoff and
+anti-entropy?</strong></p>
+<blockquote>
+<p>Read repair fixes stale replicas when a read notices a mismatch.
+Hinted handoff lets another node temporarily accept writes for a down
+replica and forward them when it returns. Anti-entropy runs in the
+background, comparing replicas (often with Merkle trees) to find and
+repair differences. Together they make eventual consistency actually
+converge.</p>
+</blockquote>
+<h2 id="scenario-based-questions-and-model-answers-5">Scenario-based
+questions and model answers</h2>
+<p class="q scn"><strong><span class="qid">S6.1</span> Placing an order spans Order, Inventory and Payment
+services. Design it so failures do not leave inconsistent
+data.</strong></p>
+<blockquote>
+<p>Use an orchestrated saga: create the order as PENDING, reserve
+inventory, charge payment, then confirm the order. Each step is a local
+transaction with an idempotency key and writes its event through the
+outbox. If payment fails, run compensations: release the inventory
+reservation and cancel the order. Add timeouts on reservations and a
+reconciliation job for stuck sagas.</p>
+</blockquote>
+<p class="q scn"><strong><span class="qid">S6.2</span> Two data centers both accept writes to a user profile
+and updates collide. How do you handle it?</strong></p>
+<blockquote>
+<p>First ask whether multi-writer is needed: assign each user a home
+region for writes and replicate elsewhere to avoid conflicts. If both
+must write, merge per field with version vectors or hybrid logical
+clocks, use CRDTs for mergeable fields (sets, counters), and use
+last-write-wins only for low-value fields. Surface true conflicts to the
+application or user.</p>
+</blockquote>
+<p class="q scn"><strong><span class="qid">S6.3</span> The product page shows 5 in stock but the item is sold
+out at checkout. Is it a bug?</strong></p>
+<blockquote>
+<p>Not necessarily: the displayed count comes from an eventually
+consistent cache or search index and is allowed to lag. The
+authoritative decrement happens atomically in the inventory store at
+checkout, with a short reservation TTL. Improve the experience by
+showing 'low stock', refreshing counts on key events, and failing
+gracefully with clear messaging.</p>
+</blockquote>
+<h1 id="topic-7-coordination-during-failures">Topic 7: Coordination
+During Failures</h1>
+<p>In a distributed system, machines crash, networks drop or delay
+messages, and clocks disagree, and a node cannot tell a slow peer from a
+dead one. Coordination techniques let a group agree on who is in charge
+and what happened, and keep serving when parts fail.</p>
+<h2 id="what-to-know-6">What to know</h2>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 74%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Area</strong></th>
+<th><strong>Key points</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Failure types</strong></td>
+<td>Crash, omission, network partition, gray (partial) failure, slow
+nodes, Byzantine faults, correlated failures such as a whole zone.</td>
+</tr>
+<tr class="even">
+<td><strong>Failure detection</strong></td>
+<td>Heartbeats and timeouts, phi accrual detectors, gossip protocols;
+the trade-off between fast detection and false positives.</td>
+</tr>
+<tr class="odd">
+<td><strong>Leader election</strong></td>
+<td>Terms or epochs, randomized timeouts, majority votes (Raft), Paxos;
+avoiding two leaders (split brain).</td>
+</tr>
+<tr class="even">
+<td><strong>Consensus and quorums</strong></td>
+<td>Majority quorum of 2f+1 nodes tolerates f failures; replicated log;
+why clusters use odd sizes.</td>
+</tr>
+<tr class="odd">
+<td><strong>Coordination services</strong></td>
+<td>ZooKeeper, etcd, Consul: configuration, service registry, leader
+election, locks.</td>
+</tr>
+<tr class="even">
+<td><strong>Distributed locks</strong></td>
+<td>Leases with expiry, fencing tokens, Redis single-instance vs Redlock
+debate, database-based locks, idempotent work as the real
+safeguard.</td>
+</tr>
+<tr class="odd">
+<td><strong>Time and ordering</strong></td>
+<td>Clock skew and NTP, Lamport clocks, vector clocks, hybrid logical
+clocks; do not use wall clocks for ordering or lock expiry.</td>
+</tr>
+<tr class="even">
+<td><strong>Redundancy and failover</strong></td>
+<td>Active-passive vs active-active, multi-AZ vs multi-region, RTO and
+RPO, health checks, automatic vs manual failover.</td>
+</tr>
+<tr class="odd">
+<td><strong>Resilience practices</strong></td>
+<td>Timeouts, retries with backoff, circuit breakers, bulkheads,
+graceful degradation, load shedding, cell-based architecture.</td>
+</tr>
+<tr class="even">
+<td><strong>Operational readiness</strong></td>
+<td>Backups and restore tests, disaster recovery runbooks, chaos
+engineering, game days, postmortems.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="diagram-6">Diagram</h2>
+<p><img src="images/topic7-coordination.png"
+title="Coordination During Failures"
+loading="lazy"
+alt="Figure 7. Raft-style leader election: heartbeats stop, a follower times out, requests votes and a majority elects it." /></p>
+<p><em>Figure 7. Raft-style leader election: heartbeats stop, a follower
+times out, requests votes and a majority elects it.</em></p>
+<h2 id="interview-questions-and-model-answers-6">Interview questions and
+model answers</h2>
+<p class="q"><strong><span class="qid">Q7.1</span> Why can't a node tell whether another node is slow or
+dead?</strong></p>
+<blockquote>
+<p>Because a missing reply could mean the peer crashed, the network
+dropped or delayed the message, or the peer is paused (GC, overload).
+Failure detectors use timeouts, so they are only suspicions. A short
+timeout detects real failures quickly but causes false alarms and
+needless failovers; a long timeout is safer but slower to recover.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q7.2</span> How does Raft elect a leader?</strong></p>
+<blockquote>
+<p>Followers expect heartbeats from the leader. If a follower's
+randomized election timeout expires, it becomes a candidate, increments
+its term and requests votes. A node votes once per term and only for a
+candidate whose log is at least as up to date. A candidate with a
+majority becomes leader and starts sending heartbeats; a higher term
+always wins, and randomized timeouts make split votes rare.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q7.3</span> What is split brain and how do you prevent
+it?</strong></p>
+<blockquote>
+<p>Split brain is when two nodes both believe they are the leader, often
+after a partition, and accept conflicting writes. Prevent it with
+majority quorums (only the side with more than half the nodes can elect
+a leader or commit), terms or epochs so stale leaders are rejected,
+leases that expire, and fencing tokens that storage checks.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q7.4</span> Why use an odd number of nodes, and how many failures
+are tolerated?</strong></p>
+<blockquote>
+<p>A majority needs more than half of the nodes. 3 nodes tolerate 1
+failure, 5 tolerate 2, 7 tolerate 3. An even count adds cost without
+tolerating more failures (4 nodes still tolerate only 1, and a 2-2
+partition leaves no majority).</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q7.5</span> How do you make a distributed lock safe?</strong></p>
+<blockquote>
+<p>Use a lease so the lock expires if the holder dies, and use a fencing
+token: a monotonically increasing number issued with each grant that the
+protected resource checks, rejecting writes from older tokens. This
+handles a client that pauses (for example in GC) and resumes after its
+lease expired. Where possible make the work itself idempotent rather
+than depending on the lock alone.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q7.6</span> Why not trust wall-clock time, and what are the
+alternatives?</strong></p>
+<blockquote>
+<p>Clocks drift and jump (NTP corrections), so two machines can disagree
+by milliseconds or more, and events can appear out of order. Lamport
+clocks give a consistent ordering of causally related events, vector
+clocks detect concurrent events, and hybrid logical clocks combine
+physical time with a counter. Some systems use bounded-uncertainty
+clocks (Spanner TrueTime).</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q7.7</span> Explain RTO and RPO, and active-active vs
+active-passive.</strong></p>
+<blockquote>
+<p>RPO (recovery point objective) is how much data you can afford to
+lose, set by replication frequency. RTO (recovery time objective) is how
+long you can be down. Active-passive keeps a standby that takes over:
+simpler, cheaper, but failover takes time and the standby may be
+untested. Active-active serves traffic from several sites at once:
+faster recovery and better latency, but data conflicts and cost are
+harder.</p>
+</blockquote>
+<p class="q"><strong><span class="qid">Q7.8</span> What are graceful degradation, load shedding and
+bulkheads, and why practice chaos engineering?</strong></p>
+<blockquote>
+<p>Graceful degradation drops non-essential features (recommendations,
+reviews) to keep core flows working. Load shedding rejects excess
+low-priority requests early to protect the system. Bulkheads isolate
+resources (pools, queues, cells) so one failure cannot take down
+everything. Chaos engineering injects real failures in a controlled way
+to find weaknesses and prove recovery works before an outage does.</p>
+</blockquote>
+<h2 id="scenario-based-questions-and-model-answers-6">Scenario-based
+questions and model answers</h2>
+<p class="q scn"><strong><span class="qid">S7.1</span> A Redis-based lock lets a scheduled job run twice after
+a long GC pause. How do you fix it?</strong></p>
+<blockquote>
+<p>The first worker paused past its lease, the lock expired, a second
+worker took over, then the first resumed and acted. Add fencing tokens
+that the data store validates so the stale worker's writes are rejected,
+keep lease renewal and sensible expiry, and make the job idempotent
+(unique run id, upsert semantics). For critical coordination use a
+consensus-based store such as etcd or ZooKeeper.</p>
+</blockquote>
+<p class="q scn"><strong><span class="qid">S7.2</span> A network partition splits a 5-node cluster into 3 and 2
+nodes. What should happen?</strong></p>
+<blockquote>
+<p>The 3-node side holds a majority, so it keeps its leader (or elects
+one) and continues accepting writes. The 2-node side cannot reach a
+quorum, so it stops accepting writes and may serve stale reads only if
+allowed. When the partition heals, the minority nodes discard any
+uncommitted entries and catch up from the leader's log. Clients should
+retry against the majority side.</p>
+</blockquote>
+<p class="q scn"><strong><span class="qid">S7.3</span> The primary region goes down. Walk through your
+failover.</strong></p>
+<blockquote>
+<p>Detect the outage through health checks and confirm it (avoid failing
+over on a false alarm), then follow a runbook: promote the replica
+database in the standby region (accepting data loss up to the
+replication lag, which is your RPO), shift traffic using global load
+balancing or DNS with low TTLs, scale up the standby, and verify key
+flows. Afterwards reconcile lost writes and restore redundancy. Test the
+whole procedure regularly through game days.</p>
+</blockquote>
+<h1 id="appendix-numbers-and-formulas-to-memorize">Appendix: numbers and
+formulas to memorize</h1>
+<h2 id="approximate-latencies">Approximate latencies</h2>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 62%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Operation</strong></th>
+<th><strong>Order of magnitude</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>CPU cache reference</strong></td>
+<td>1-10 ns</td>
+</tr>
+<tr class="even">
+<td><strong>Main memory reference</strong></td>
+<td>about 100 ns</td>
+</tr>
+<tr class="odd">
+<td><strong>SSD random read</strong></td>
+<td>about 100 microseconds</td>
+</tr>
+<tr class="even">
+<td><strong>Round trip within one data center</strong></td>
+<td>about 0.5 ms</td>
+</tr>
+<tr class="odd">
+<td><strong>Disk (HDD) seek</strong></td>
+<td>about 10 ms</td>
+</tr>
+<tr class="even">
+<td><strong>Round trip across regions or continents</strong></td>
+<td>50-150 ms</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="quick-conversions">Quick conversions</h2>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 62%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Item</strong></th>
+<th><strong>Value</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Seconds per day</strong></td>
+<td>86,400, round to 100,000</td>
+</tr>
+<tr class="even">
+<td><strong>1 million requests per day</strong></td>
+<td>about 12 requests per second</td>
+</tr>
+<tr class="odd">
+<td><strong>1 billion requests per month</strong></td>
+<td>about 400 requests per second</td>
+</tr>
+<tr class="even">
+<td><strong>Peak traffic</strong></td>
+<td>2-5x the average</td>
+</tr>
+<tr class="odd">
+<td><strong>1 Gbps network</strong></td>
+<td>about 125 MB per second</td>
+</tr>
+<tr class="even">
+<td><strong>Availability 99.9% / 99.99%</strong></td>
+<td>8.8 hours / 52 minutes of downtime per year</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="formulas-and-rules">Formulas and rules</h2>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 62%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Rule</strong></th>
+<th><strong>Statement</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Availability in series</strong></td>
+<td>A1 x A2 x ... (it drops)</td>
+</tr>
+<tr class="even">
+<td><strong>Availability in parallel</strong></td>
+<td>1 - (1-A1) x (1-A2)</td>
+</tr>
+<tr class="odd">
+<td><strong>Little's Law</strong></td>
+<td>Concurrency L = arrival rate x time in system</td>
+</tr>
+<tr class="even">
+<td><strong>Quorum overlap</strong></td>
+<td>W + R &gt; N</td>
+</tr>
+<tr class="odd">
+<td><strong>Majority tolerance</strong></td>
+<td>2f + 1 nodes tolerate f failures</td>
+</tr>
+<tr class="even">
+<td><strong>Consistent hashing</strong></td>
+<td>Adding a node moves about 1/N of keys</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="common-mistakes-to-avoid-in-interviews">Common mistakes to avoid
+in interviews</h2>
+<ul>
+<li><p>Jumping to components before clarifying requirements and
+scale.</p></li>
+<li><p>Naming technologies without explaining why they fit the access
+pattern.</p></li>
+<li><p>Describing only the happy path; always say what happens when a
+node, dependency or region fails.</p></li>
+<li><p>Claiming exactly-once delivery or 'strong consistency everywhere'
+without the cost.</p></li>
+<li><p>Ignoring hot keys, retries and idempotency.</p></li>
+</ul>
+<h1 id="appendix-abbreviations-and-full-forms">Appendix: abbreviations
+and full forms</h1>
+<p>Terms are listed alphabetically. The last column says what the term
+means in this guide.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 17%" />
+<col style="width: 40%" />
+<col style="width: 41%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Term</strong></th>
+<th><strong>Full form</strong></th>
+<th><strong>Meaning here</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>2PC / 3PC</strong></td>
+<td>Two-Phase Commit / Three-Phase Commit</td>
+<td>Protocols that make several nodes commit or abort a transaction
+together</td>
+</tr>
+<tr class="even">
+<td><strong>ACID</strong></td>
+<td>Atomicity, Consistency, Isolation, Durability</td>
+<td>Guarantees of a database transaction</td>
+</tr>
+<tr class="odd">
+<td><strong>API</strong></td>
+<td>Application Programming Interface</td>
+<td>Contract for how software components talk</td>
+</tr>
+<tr class="even">
+<td><strong>AP / CP / CA</strong></td>
+<td>Availability-Partition tolerance / Consistency-Partition tolerance /
+Consistency-Availability</td>
+<td>Which two CAP properties a system favors</td>
+</tr>
+<tr class="odd">
+<td><strong>AZ</strong></td>
+<td>Availability Zone</td>
+<td>An isolated data center location inside a cloud region</td>
+</tr>
+<tr class="even">
+<td><strong>BASE</strong></td>
+<td>Basically Available, Soft state, Eventual consistency</td>
+<td>Looser alternative to ACID for distributed stores</td>
+</tr>
+<tr class="odd">
+<td><strong>CAP</strong></td>
+<td>Consistency, Availability, Partition tolerance</td>
+<td>Theorem on trade-offs during a network partition</td>
+</tr>
+<tr class="even">
+<td><strong>CDC</strong></td>
+<td>Change Data Capture</td>
+<td>Streaming database changes to other systems</td>
+</tr>
+<tr class="odd">
+<td><strong>CDN</strong></td>
+<td>Content Delivery Network</td>
+<td>Edge servers that cache content near users</td>
+</tr>
+<tr class="even">
+<td><strong>CPU</strong></td>
+<td>Central Processing Unit</td>
+<td>The processor</td>
+</tr>
+<tr class="odd">
+<td><strong>CQRS</strong></td>
+<td>Command Query Responsibility Segregation</td>
+<td>Separate models for writing and reading data</td>
+</tr>
+<tr class="even">
+<td><strong>CRDT</strong></td>
+<td>Conflict-free Replicated Data Type</td>
+<td>Data type that merges concurrent updates automatically</td>
+</tr>
+<tr class="odd">
+<td><strong>DB</strong></td>
+<td>Database</td>
+<td>Data store</td>
+</tr>
+<tr class="even">
+<td><strong>DLQ</strong></td>
+<td>Dead-Letter Queue</td>
+<td>Holds messages that repeatedly fail processing</td>
+</tr>
+<tr class="odd">
+<td><strong>DNS</strong></td>
+<td>Domain Name System</td>
+<td>Translates host names to IP addresses</td>
+</tr>
+<tr class="even">
+<td><strong>EXPLAIN / EXPLAIN ANALYZE</strong></td>
+<td>SQL command (not an acronym)</td>
+<td>Shows or runs a query plan to see how the database executes it</td>
+</tr>
+<tr class="odd">
+<td><strong>GB / TB / KB / MB</strong></td>
+<td>Gigabyte / Terabyte / Kilobyte / Megabyte</td>
+<td>Units of data size</td>
+</tr>
+<tr class="even">
+<td><strong>Gbps</strong></td>
+<td>Gigabits per second</td>
+<td>Network speed</td>
+</tr>
+<tr class="odd">
+<td><strong>GC</strong></td>
+<td>Garbage Collection</td>
+<td>Automatic memory cleanup in the JVM; can pause an application</td>
+</tr>
+<tr class="even">
+<td><strong>gRPC</strong></td>
+<td>gRPC Remote Procedure Call</td>
+<td>High-performance RPC framework over HTTP/2</td>
+</tr>
+<tr class="odd">
+<td><strong>HBase</strong></td>
+<td>Hadoop Database</td>
+<td>Wide-column store built on Hadoop</td>
+</tr>
+<tr class="even">
+<td><strong>HDD / SSD</strong></td>
+<td>Hard Disk Drive / Solid-State Drive</td>
+<td>Spinning-disk and flash storage</td>
+</tr>
+<tr class="odd">
+<td><strong>HLC</strong></td>
+<td>Hybrid Logical Clock</td>
+<td>Clock combining physical time and a logical counter</td>
+</tr>
+<tr class="even">
+<td><strong>HTTP / HTTPS</strong></td>
+<td>HyperText Transfer Protocol / HTTP Secure</td>
+<td>Web request protocol and its TLS-encrypted form</td>
+</tr>
+<tr class="odd">
+<td><strong>ID</strong></td>
+<td>Identifier</td>
+<td>Unique name or number for a record</td>
+</tr>
+<tr class="even">
+<td><strong>IP</strong></td>
+<td>Internet Protocol</td>
+<td>Addressing system for machines on a network</td>
+</tr>
+<tr class="odd">
+<td><strong>ISR</strong></td>
+<td>In-Sync Replicas</td>
+<td>Kafka replicas that are caught up with the leader</td>
+</tr>
+<tr class="even">
+<td><strong>JSON</strong></td>
+<td>JavaScript Object Notation</td>
+<td>Text format for structured data</td>
+</tr>
+<tr class="odd">
+<td><strong>JVM</strong></td>
+<td>Java Virtual Machine</td>
+<td>Runtime that executes Java programs</td>
+</tr>
+<tr class="even">
+<td><strong>JWT</strong></td>
+<td>JSON Web Token</td>
+<td>Signed token carrying identity claims</td>
+</tr>
+<tr class="odd">
+<td><strong>L4 / L7</strong></td>
+<td>Layer 4 (transport) / Layer 7 (application)</td>
+<td>OSI network layers; used to classify load balancers</td>
+</tr>
+<tr class="even">
+<td><strong>LB</strong></td>
+<td>Load Balancer</td>
+<td>Spreads traffic across servers</td>
+</tr>
+<tr class="odd">
+<td><strong>LFU / LRU</strong></td>
+<td>Least Frequently Used / Least Recently Used</td>
+<td>Cache eviction policies</td>
+</tr>
+<tr class="even">
+<td><strong>LSM tree</strong></td>
+<td>Log-Structured Merge tree</td>
+<td>Write-optimized storage structure</td>
+</tr>
+<tr class="odd">
+<td><strong>LWW</strong></td>
+<td>Last-Write-Wins</td>
+<td>Conflict rule where the newest write replaces others</td>
+</tr>
+<tr class="even">
+<td><strong>MB/s</strong></td>
+<td>Megabytes per second</td>
+<td>Data throughput</td>
+</tr>
+<tr class="odd">
+<td><strong>ms / ns</strong></td>
+<td>Millisecond / Nanosecond</td>
+<td>One thousandth / one billionth of a second</td>
+</tr>
+<tr class="even">
+<td><strong>mTLS</strong></td>
+<td>Mutual Transport Layer Security</td>
+<td>Both client and server prove identity with certificates</td>
+</tr>
+<tr class="odd">
+<td><strong>MTBF / MTTR</strong></td>
+<td>Mean Time Between Failures / Mean Time To Recovery</td>
+<td>Reliability and recovery measures</td>
+</tr>
+<tr class="even">
+<td><strong>MVCC</strong></td>
+<td>Multi-Version Concurrency Control</td>
+<td>Readers see snapshots so they do not block writers</td>
+</tr>
+<tr class="odd">
+<td><strong>N, W, R</strong></td>
+<td>Replicas, Write quorum, Read quorum</td>
+<td>Quorum math: W + R &gt; N gives read-write overlap</td>
+</tr>
+<tr class="even">
+<td><strong>NoSQL</strong></td>
+<td>Not Only SQL</td>
+<td>Non-relational database families</td>
+</tr>
+<tr class="odd">
+<td><strong>NTP</strong></td>
+<td>Network Time Protocol</td>
+<td>Synchronizes clocks across machines</td>
+</tr>
+<tr class="even">
+<td><strong>OAuth2 / OIDC</strong></td>
+<td>Open Authorization 2.0 / OpenID Connect</td>
+<td>Standards for delegated access and sign-in</td>
+</tr>
+<tr class="odd">
+<td><strong>p50 / p95 / p99</strong></td>
+<td>50th / 95th / 99th percentile</td>
+<td>Value below which 50%, 95%, 99% of requests fall</td>
+</tr>
+<tr class="even">
+<td><strong>PACELC</strong></td>
+<td>Partition: Availability or Consistency; Else: Latency or
+Consistency</td>
+<td>Extension of CAP covering normal operation</td>
+</tr>
+<tr class="odd">
+<td><strong>PA/EL, PC/EC</strong></td>
+<td>Partition Available / Else Latency; Partition Consistent / Else
+Consistent</td>
+<td>PACELC classifications of databases</td>
+</tr>
+<tr class="even">
+<td><strong>Protobuf</strong></td>
+<td>Protocol Buffers</td>
+<td>Compact binary serialization format used by gRPC</td>
+</tr>
+<tr class="odd">
+<td><strong>QPS / RPS / TPS</strong></td>
+<td>Queries / Requests / Transactions Per Second</td>
+<td>Traffic and throughput measures</td>
+</tr>
+<tr class="even">
+<td><strong>QUIC</strong></td>
+<td>Quick UDP Internet Connections</td>
+<td>Transport protocol underlying HTTP/3</td>
+</tr>
+<tr class="odd">
+<td><strong>RED</strong></td>
+<td>Rate, Errors, Duration</td>
+<td>Monitoring method for services</td>
+</tr>
+<tr class="even">
+<td><strong>REST</strong></td>
+<td>Representational State Transfer</td>
+<td>Resource-oriented API style over HTTP</td>
+</tr>
+<tr class="odd">
+<td><strong>RPO / RTO</strong></td>
+<td>Recovery Point Objective / Recovery Time Objective</td>
+<td>Acceptable data loss / acceptable downtime</td>
+</tr>
+<tr class="even">
+<td><strong>S3</strong></td>
+<td>Simple Storage Service</td>
+<td>Amazon's object storage; also the pattern name</td>
+</tr>
+<tr class="odd">
+<td><strong>SLA / SLI / SLO</strong></td>
+<td>Service Level Agreement / Indicator / Objective</td>
+<td>Contract / measurement / internal target</td>
+</tr>
+<tr class="even">
+<td><strong>SQL</strong></td>
+<td>Structured Query Language</td>
+<td>Language of relational databases</td>
+</tr>
+<tr class="odd">
+<td><strong>SQS</strong></td>
+<td>Simple Queue Service</td>
+<td>Amazon's managed message queue</td>
+</tr>
+<tr class="even">
+<td><strong>SSE</strong></td>
+<td>Server-Sent Events</td>
+<td>One-way server push over HTTP</td>
+</tr>
+<tr class="odd">
+<td><strong>SSTable</strong></td>
+<td>Sorted String Table</td>
+<td>Immutable sorted file used by LSM-based stores</td>
+</tr>
+<tr class="even">
+<td><strong>TCC</strong></td>
+<td>Try-Confirm-Cancel</td>
+<td>Reservation-style distributed transaction pattern</td>
+</tr>
+<tr class="odd">
+<td><strong>TCP / UDP</strong></td>
+<td>Transmission Control Protocol / User Datagram Protocol</td>
+<td>Reliable and connectionless transports</td>
+</tr>
+<tr class="even">
+<td><strong>TLS</strong></td>
+<td>Transport Layer Security</td>
+<td>Encryption for network connections</td>
+</tr>
+<tr class="odd">
+<td><strong>TTL</strong></td>
+<td>Time To Live</td>
+<td>How long a cache entry or DNS record stays valid</td>
+</tr>
+<tr class="even">
+<td><strong>URL</strong></td>
+<td>Uniform Resource Locator</td>
+<td>Web address</td>
+</tr>
+<tr class="odd">
+<td><strong>USE</strong></td>
+<td>Utilization, Saturation, Errors</td>
+<td>Monitoring method for resources</td>
+</tr>
+<tr class="even">
+<td><strong>UUID</strong></td>
+<td>Universally Unique Identifier</td>
+<td>128-bit ID generated without coordination</td>
+</tr>
+<tr class="odd">
+<td><strong>WAL</strong></td>
+<td>Write-Ahead Log</td>
+<td>Log written before data changes, for durability and recovery</td>
+</tr>
+</tbody>
+</table></div>
+
+<footer class="foot">Model answers are general guidance. Adapt them to the scale, constraints and requirements of the actual interview question.</footer>
+</main>
+<script src="../assets/script.js"></script>
+</body>
+</html>

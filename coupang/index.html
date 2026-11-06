@@ -1,0 +1,895 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coupang Interview Prep Catalog | My Interview Playbook</title>
+<meta name="description" content="Coupang interview preparation catalog: loop, 8-week plan, topic catalogs and resources.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="menu-btn" id="menuBtn" aria-label="Toggle contents" aria-expanded="false">Contents</button>
+<aside class="sidebar" id="sidebar">
+  <a class="back" href="../">&larr; All tracks</a>
+  <p class="side-title">Contents</p>
+  <nav>
+<a href="#contents">Contents</a>
+<a href="#part-a-coupang-interview-prep-catalog">Overview</a>
+<a href="#a1-the-coupang-loop-at-a-glance">A1 The Coupang loop at a glance</a>
+<a href="#a2-8-week-preparation-plan">A2 8-week preparation plan</a>
+<a href="#a3-coding-rounds-dsa-catalog">A3 Coding rounds: DSA catalog</a>
+<a href="#a4-java-language-and-concurrency">A4 Java language and concurrency</a>
+<a href="#a5-low-level-design">A5 Low-level design</a>
+<a href="#a6-high-level-design-overview">A6 High-level design overview</a>
+<a href="#a7-data-messaging-and-cloud">A7 Data, messaging and cloud</a>
+<a href="#a8-behavioral-round-and-bar-raiser">A8 Behavioral round and Bar Raiser</a>
+<a href="#a9-step-by-step-preparation">A9 Step-by-step preparation</a>
+<a href="#a10-resource-library">A10 Resource library</a>
+<a href="#a11-final-week-checklist-and-sources">A11 Final-week checklist and sources</a>
+  </nav>
+  <label class="practice"><input type="checkbox" id="practice"> Practice mode<span>Hide answers. Click a question to reveal its answer.</span></label>
+</aside>
+<main class="content">
+<header class="hero"><p class="eyebrow">Prepared for: Hari | 5 November 2026</p><h1 class="doc-title">Coupang Interview Prep Catalog</h1><p class="subtitle">Interview loop, 8-week plan, topic catalogs and resources</p><p class="intro">The Coupang preparation catalog: the interview loop, an 8-week plan, topic catalogs, step-by-step preparation and resources. For the underlying design theory, see the <a href="../systemdesign/">System Design track</a>.</p></header>
+<h1 id="contents">Contents</h1>
+<p>Everything about preparing for Coupang, from the loop format to the final-week checklist.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 12%" />
+<col style="width: 37%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Group</strong></th>
+<th><strong>Section</strong></th>
+<th><strong>What it covers</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Catalog</strong></td>
+<td>A1 The Coupang loop at a glance</td>
+<td>What each round tests and how to split your time</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>A2 8-week preparation plan</td>
+<td>Week-by-week focus and outputs</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>A3 Coding rounds: DSA catalog</td>
+<td>Topics, patterns, must-solve problems, execution checklist</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>A4 Java language and concurrency</td>
+<td>Collections, JVM, threading, Spring Boot, hands-on exercises</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>A5 Low-level design</td>
+<td>Patterns and 10 practice designs</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>A6 High-level design overview</td>
+<td>Building blocks and Coupang-style problems</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>A7 Data, messaging and cloud</td>
+<td>Databases, Redis, Kafka, Kubernetes, observability</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>A8 Behavioral round and Bar Raiser</td>
+<td>Story bank, principal-level scope, sample prompts</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>A9 Step-by-step preparation</td>
+<td>11 steps from baseline to interview day</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>A10 Resource library</td>
+<td>Books, sites and documentation by topic</td>
+</tr>
+<tr class="odd">
+<td></td>
+<td>A11 Final-week checklist and sources</td>
+<td>Last-mile tasks and caveats</td>
+</tr>
+</tbody>
+</table></div>
+<h1 id="part-a-coupang-interview-prep-catalog">Coupang Interview
+Prep Catalog</h1>
+<p>Coupang is a large e-commerce and logistics company, so its
+engineering interviews reward strong fundamentals, high-scale design
+skill and an ownership mindset. The structure below is based on public
+interview guides that describe an Amazon-style loop, including
+leadership-principle questions and a Bar Raiser round. Treat the exact
+round format as a strong guess and confirm it with your recruiter.</p>
+<h2 id="a1-the-coupang-loop-at-a-glance">A1 The Coupang loop at a
+glance</h2>
+<p>Plan your time in proportion to how much each round can sink you. As
+a rough split: 35% coding, 30% design (low-level plus system design),
+15% language and data fundamentals, 20% behavioral.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 29%" />
+<col style="width: 54%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Round</strong></th>
+<th><strong>What it tests</strong></th>
+<th><strong>Prep weight</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Online assessment or phone screen</strong></td>
+<td>1-2 LeetCode Medium problems, timed</td>
+<td>15%</td>
+</tr>
+<tr class="even">
+<td><strong>Coding (DSA)</strong></td>
+<td>Medium to Hard problems, complexity trade-offs, clean code</td>
+<td>20%</td>
+</tr>
+<tr class="odd">
+<td><strong>Low-level design</strong></td>
+<td>Class modeling, design patterns, thread safety</td>
+<td>15%</td>
+</tr>
+<tr class="even">
+<td><strong>High-level design</strong></td>
+<td>Scale, sharding, caching, failure handling</td>
+<td>30%</td>
+</tr>
+<tr class="odd">
+<td><strong>Behavioral and Bar Raiser</strong></td>
+<td>Ownership, customer obsession, disagree and commit, scope of
+impact</td>
+<td>20%</td>
+</tr>
+</tbody>
+</table></div>
+<p><em>The Bar Raiser is reported to have an independent say on the
+hire, so prepare it as seriously as the technical rounds.</em></p>
+<h2 id="technologies-to-be-comfortable-with">Technologies to be
+comfortable with</h2>
+<ul>
+<li><p>Languages: Java is the most widely used (Go, Python and C++ also
+appear). Know concurrency and memory management well in your chosen
+language.</p></li>
+<li><p>Distributed systems: microservices, API gateways, event-driven
+design with Kafka or RabbitMQ, distributed caching with Redis, job
+schedulers.</p></li>
+<li><p>Databases: PostgreSQL and MySQL (indexing, isolation levels) and
+NoSQL such as DynamoDB and MongoDB, with trade-offs for high-throughput
+transactional systems.</p></li>
+<li><p>Cloud and operations: Docker, Kubernetes, CI/CD, metrics and
+tracing for observability.</p></li>
+<li><p>Domain bonus: inventory management, delivery routing and
+optimization, large-scale data processing.</p></li>
+</ul>
+<h2 id="a2-8-week-preparation-plan">A2 8-week preparation plan</h2>
+<p>Spend about 2 hours on weekdays (60-90 minutes on problems, 30
+minutes on theory) and 4 hours on weekends (one timed mock plus review).
+If your interview is sooner, compress each stage proportionally but keep
+the order.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 53%" />
+<col style="width: 35%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Week</strong></th>
+<th><strong>Focus</strong></th>
+<th><strong>Output</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>1-2</strong></td>
+<td>Arrays, strings, hashing, two pointers, sliding window, binary
+search, stacks</td>
+<td>40 problems and a pattern notebook</td>
+</tr>
+<tr class="even">
+<td><strong>3-4</strong></td>
+<td>Trees, graphs, heaps, intervals, backtracking</td>
+<td>40 problems and 2 timed mocks</td>
+</tr>
+<tr class="odd">
+<td><strong>5</strong></td>
+<td>Dynamic programming and Java concurrency</td>
+<td>20 DP problems, 3 concurrency exercises</td>
+</tr>
+<tr class="even">
+<td><strong>6</strong></td>
+<td>Low-level design: patterns plus 6 designs coded</td>
+<td>6 compiling mini-projects with tests</td>
+</tr>
+<tr class="odd">
+<td><strong>7</strong></td>
+<td>High-level design: 8 designs, Kafka, Redis and database deep
+dives</td>
+<td>8 one-page design documents</td>
+</tr>
+<tr class="even">
+<td><strong>8</strong></td>
+<td>Mocks, STAR stories, company research</td>
+<td>3 full mock loops and 6 rehearsed stories</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="a3-coding-rounds-dsa-catalog">A3 Coding rounds: DSA catalog</h2>
+<p>Aim for about 150 problems in total, mostly Medium with around 30
+Hard. Learn a pattern first, then solve 5-8 problems on it. For every
+problem, state the brute-force approach and its complexity before
+optimizing.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 19%" />
+<col style="width: 36%" />
+<col style="width: 43%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Topic</strong></th>
+<th><strong>Patterns to master</strong></th>
+<th><strong>Must-solve examples</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Arrays and strings</strong></td>
+<td>Two pointers, sliding window, prefix sums, in-place partition</td>
+<td>Longest substring without repeats; Trapping rain water; Subarray sum
+equals K</td>
+</tr>
+<tr class="even">
+<td><strong>Hashing</strong></td>
+<td>Frequency maps, grouping, two-sum variants</td>
+<td>Group anagrams; LRU cache; Top K frequent</td>
+</tr>
+<tr class="odd">
+<td><strong>Binary search</strong></td>
+<td>On index and on answer space</td>
+<td>Search in rotated array; Koko eating bananas; Median of two sorted
+arrays</td>
+</tr>
+<tr class="even">
+<td><strong>Stacks and queues</strong></td>
+<td>Monotonic stack, deque window</td>
+<td>Daily temperatures; Largest rectangle in histogram; Sliding window
+maximum</td>
+</tr>
+<tr class="odd">
+<td><strong>Linked lists</strong></td>
+<td>Fast/slow pointers, reversal, merging</td>
+<td>Reverse in K-groups; Merge K sorted lists</td>
+</tr>
+<tr class="even">
+<td><strong>Trees</strong></td>
+<td>DFS and BFS, lowest common ancestor, serialization, BST
+operations</td>
+<td>Serialize and deserialize tree; Maximum path sum</td>
+</tr>
+<tr class="odd">
+<td><strong>Graphs</strong></td>
+<td>BFS, DFS, topological sort, union-find, Dijkstra</td>
+<td>Course schedule; Number of islands; Network delay time; Word
+ladder</td>
+</tr>
+<tr class="even">
+<td><strong>Heaps</strong></td>
+<td>Top-K, two heaps, k-way merge</td>
+<td>Median from data stream; Task scheduler; K closest points</td>
+</tr>
+<tr class="odd">
+<td><strong>Intervals</strong></td>
+<td>Sort and sweep, merge, meeting rooms</td>
+<td>Merge intervals; Meeting rooms II; Insert interval</td>
+</tr>
+<tr class="even">
+<td><strong>Dynamic programming</strong></td>
+<td>1D and 2D, knapsack, LIS, string DP, state machines</td>
+<td>Coin change; Edit distance; House robber; Stock with cooldown</td>
+</tr>
+<tr class="odd">
+<td><strong>Backtracking</strong></td>
+<td>Subsets, permutations, constraint search</td>
+<td>N-queens; Combination sum; Word search</td>
+</tr>
+<tr class="even">
+<td><strong>Greedy</strong></td>
+<td>Sort by key, exchange argument</td>
+<td>Jump game; Gas station; Partition labels</td>
+</tr>
+<tr class="odd">
+<td><strong>Tries and bit tricks</strong></td>
+<td>Prefix search, XOR</td>
+<td>Implement trie; Word search II; Single number</td>
+</tr>
+</tbody>
+</table></div>
+<p>Coupang-flavored practice: delivery routing (shortest path with
+constraints), inventory and order batching (interval and heap problems),
+delayed task schedulers (heap plus time), and rate limiters and
+sliding-window counters.</p>
+<h2 id="execution-checklist-for-every-problem">Execution checklist for
+every problem</h2>
+<ul>
+<li><p>Restate the problem and confirm edge cases and input
+sizes.</p></li>
+<li><p>State the brute force and its complexity.</p></li>
+<li><p>Optimize, then say the final time and space complexity out
+loud.</p></li>
+<li><p>Code cleanly, then dry-run one normal and one edge case.</p></li>
+<li><p>Practice in a plain editor or a timed HackerRank-style
+environment, not an IDE with autocomplete.</p></li>
+</ul>
+<h2 id="a4-java-language-and-concurrency">A4 Java language and
+concurrency</h2>
+<p>Java is the safest primary choice. Interviewers probe several layers
+below the framework, so be ready to explain internals, not just
+usage.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 23%" />
+<col style="width: 76%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Area</strong></th>
+<th><strong>Know cold</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Collections</strong></td>
+<td>HashMap internals (hashing, resize, treeification),
+ConcurrentHashMap, ArrayList vs LinkedList, PriorityQueue, the equals
+and hashCode contract</td>
+</tr>
+<tr class="even">
+<td><strong>Memory and JVM</strong></td>
+<td>Heap generations, G1 vs ZGC, GC tuning basics, memory leaks, reading
+heap and thread dumps, Java memory model and happens-before</td>
+</tr>
+<tr class="odd">
+<td><strong>Concurrency</strong></td>
+<td>synchronized vs ReentrantLock, volatile, atomics and CAS,
+ExecutorService and thread-pool sizing, CompletableFuture, deadlocks,
+producer-consumer with BlockingQueue</td>
+</tr>
+<tr class="even">
+<td><strong>Modern Java</strong></td>
+<td>Streams, records, virtual threads (Java 21), Optional, sealed
+classes</td>
+</tr>
+<tr class="odd">
+<td><strong>Spring Boot</strong></td>
+<td>Bean lifecycle, transaction propagation and pitfalls,
+connection-pool tuning, circuit breakers (Resilience4j), async and
+timeouts</td>
+</tr>
+<tr class="even">
+<td><strong>Go or Python (if chosen)</strong></td>
+<td>Go: goroutines, channels, select, context. Python: GIL implications,
+asyncio, generators</td>
+</tr>
+</tbody>
+</table></div>
+<p>Hands-on exercises: implement a thread-safe LRU cache, a bounded
+blocking queue using wait and notify, a token-bucket rate limiter, and a
+simple scheduled-task executor. For each, be ready to explain the
+locking strategy you chose and why.</p>
+<h2 id="a5-low-level-design">A5 Low-level design</h2>
+<p>LLD rounds ask for runnable, extensible, thread-safe classes in 45-60
+minutes. Clarify requirements, list the entities, define interfaces,
+code the core flow, then discuss extension points.</p>
+<h2 id="patterns-to-know-with-a-concrete-use">Patterns to know, with a
+concrete use</h2>
+<ul>
+<li><p>Strategy: pricing rules, routing algorithms, eviction
+policies.</p></li>
+<li><p>Factory and Builder: order and shipment objects.</p></li>
+<li><p>Observer: order status notifications.</p></li>
+<li><p>State: order or shipment lifecycle.</p></li>
+<li><p>Singleton (thread-safe): configuration and registries.</p></li>
+<li><p>Circuit Breaker and Retry with backoff: calls to downstream
+services.</p></li>
+<li><p>Chain of Responsibility: validation and fraud checks.</p></li>
+</ul>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 7%" />
+<col style="width: 47%" />
+<col style="width: 45%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>#</strong></th>
+<th><strong>Practice design</strong></th>
+<th><strong>What it tests</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>LRU or LFU cache, thread-safe</td>
+<td>Data structures, locking</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Rate limiter (token bucket, sliding window)</td>
+<td>Concurrency, time handling</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Order processing pipeline</td>
+<td>State machine, idempotency, validation chain</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>Inventory reservation service</td>
+<td>Atomic updates, preventing overselling</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>Delayed task scheduler</td>
+<td>Heap, threads, retries</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td>Parking lot or locker allocation</td>
+<td>Entities, allocation strategy</td>
+</tr>
+<tr class="odd">
+<td>7</td>
+<td>Notification service (email, SMS, push)</td>
+<td>Strategy, queueing, retry</td>
+</tr>
+<tr class="even">
+<td>8</td>
+<td>Elevator or delivery-slot assignment</td>
+<td>State, scheduling</td>
+</tr>
+<tr class="odd">
+<td>9</td>
+<td>In-memory publish-subscribe or message queue</td>
+<td>Concurrency, consumer groups</td>
+</tr>
+<tr class="even">
+<td>10</td>
+<td>Splitwise-style ledger</td>
+<td>Modeling, consistency</td>
+</tr>
+</tbody>
+</table></div>
+<p><em>SOLID principles are asked directly. Prepare one example of each
+from your own codebases.</em></p>
+<h2 id="a6-high-level-design-overview">A6 High-level design
+overview</h2>
+<p>Use one framework every time: requirements and scale numbers, APIs,
+data model, high-level diagram, a deep dive on the hardest component,
+then failure modes and trade-offs. Always do capacity math out loud.
+The <a href="../systemdesign/">System Design track</a> teaches the seven underlying topics in depth,
+with diagrams, questions and answers.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 37%" />
+<col style="width: 62%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Problem</strong></th>
+<th><strong>Hard parts to cover</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Flash-sale or Rocket-Delivery-style order
+system</strong></td>
+<td>Traffic spikes, queue-based load leveling, inventory reservation,
+idempotent checkout</td>
+</tr>
+<tr class="even">
+<td><strong>Real-time inventory lookup</strong></td>
+<td>Read-heavy caching, stock consistency across warehouses, bounds on
+staleness</td>
+</tr>
+<tr class="odd">
+<td><strong>Distributed delayed-task scheduler</strong></td>
+<td>Time-bucketed storage, exactly-once firing, failover</td>
+</tr>
+<tr class="even">
+<td><strong>Delivery routing and slot assignment</strong></td>
+<td>Geo indexing, batching, ETA updates, optimization vs latency</td>
+</tr>
+<tr class="odd">
+<td><strong>Product search and recommendations</strong></td>
+<td>Indexing pipeline, ranking, freshness</td>
+</tr>
+<tr class="even">
+<td><strong>Payments and ledger</strong></td>
+<td>Idempotency keys, double-entry bookkeeping, reconciliation</td>
+</tr>
+<tr class="odd">
+<td><strong>Notification system</strong></td>
+<td>Fan-out, priority queues, deduplication</td>
+</tr>
+<tr class="even">
+<td><strong>Order tracking and event pipeline</strong></td>
+<td>Event sourcing, change data capture, replay</td>
+</tr>
+<tr class="odd">
+<td><strong>URL shortener, rate limiter, distributed cache</strong></td>
+<td>Warm-up classics; be fast on these</td>
+</tr>
+</tbody>
+</table></div>
+<p>For each design, prepare how it behaves at 10x traffic, when a
+dependency is down, and during a regional failover. At Coupang scale,
+answers are judged on how you degrade, not only on the happy path.</p>
+<h2 id="a7-data-messaging-and-cloud">A7 Data, messaging and cloud</h2>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 23%" />
+<col style="width: 76%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Area</strong></th>
+<th><strong>Depth expected</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>PostgreSQL and MySQL</strong></td>
+<td>B-tree and composite index design, covering indexes, EXPLAIN plans,
+isolation levels and anomalies, MVCC, locking and deadlocks, replication
+lag, partitioning, connection pooling</td>
+</tr>
+<tr class="even">
+<td><strong>NoSQL</strong></td>
+<td>DynamoDB partition keys and hot partitions, single-table design,
+MongoDB document modeling, when to pick each over SQL</td>
+</tr>
+<tr class="odd">
+<td><strong>Redis</strong></td>
+<td>Data structures, TTL and eviction, persistence modes, distributed
+locks and their pitfalls, cluster slots</td>
+</tr>
+<tr class="even">
+<td><strong>Kafka and RabbitMQ</strong></td>
+<td>Partitioning and ordering, offsets and rebalancing, retries and
+dead-letter queues, backpressure, idempotent consumers</td>
+</tr>
+<tr class="odd">
+<td><strong>Docker and Kubernetes</strong></td>
+<td>Pods, deployments, probes, autoscaling, resource limits, rolling and
+canary deploys</td>
+</tr>
+<tr class="even">
+<td><strong>CI/CD</strong></td>
+<td>Pipeline stages, rollbacks, feature flags, blue-green
+deployment</td>
+</tr>
+<tr class="odd">
+<td><strong>Observability</strong></td>
+<td>Metrics (RED and USE), structured logs, distributed tracing, SLIs
+and SLOs, alert design</td>
+</tr>
+</tbody>
+</table></div>
+<p>Prepare two production stories from your own work in this area: one
+performance problem you diagnosed using data, and one outage or defect
+you traced to its root cause. They double as behavioral material.</p>
+<h2 id="a8-behavioral-round-and-bar-raiser">A8 Behavioral round and Bar
+Raiser</h2>
+<p>Build a bank of 6 stories, each with a number in the result, and map
+each story to two or three themes. Use the STAR structure (Situation,
+Task, Action, Result), keep each answer to about 2 minutes, and spend
+most of the time on Action and Result. Say "I" for your own
+decisions.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 24%" />
+<col style="width: 48%" />
+<col style="width: 26%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Theme</strong></th>
+<th><strong>Story prompt</strong></th>
+<th><strong>Your story (fill in)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Customer obsession</strong></td>
+<td>A time you changed a design for the end user or client</td>
+<td></td>
+</tr>
+<tr class="even">
+<td><strong>Ownership</strong></td>
+<td>Something outside your remit that you took end to end</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td><strong>Disagree and commit</strong></td>
+<td>You disagreed with a decision, then executed it fully</td>
+<td></td>
+</tr>
+<tr class="even">
+<td><strong>Failure and learning</strong></td>
+<td>A mistake you owned, and the fix</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td><strong>Delivering under pressure</strong></td>
+<td>A hard deadline or production incident</td>
+<td></td>
+</tr>
+<tr class="even">
+<td><strong>Raising the bar</strong></td>
+<td>You improved a team's engineering practice or mentored someone</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td><strong>Ambiguity and invention</strong></td>
+<td>A vague problem you turned into a shipped solution</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<p>At principal level you are judged on scope and leverage, so at least
+two stories should show cross-team influence, a platform or process
+change, or a technical strategy you drove. Your AI-native engineering
+work (agent infrastructure, engineer-as-validator workflow) is strong
+material for the invention and raise-the-bar themes; bring
+before-and-after metrics.</p>
+<h2 id="sample-prompts-to-rehearse-aloud">Sample prompts to rehearse
+aloud</h2>
+<ul>
+<li><p>Tell me about a time you pushed back on a stakeholder and were
+proven right or wrong.</p></li>
+<li><p>Describe the biggest technical risk you took, and what you did to
+limit it.</p></li>
+<li><p>Tell me about a project that failed or shipped late. What would
+you change?</p></li>
+<li><p>Describe a time you simplified something complex for
+customers.</p></li>
+<li><p>How have you grown another engineer?</p></li>
+</ul>
+<p><em>Research Coupang's customer-obsession and speed culture, and tie
+two of your stories to it.</em></p>
+<h2 id="a9-step-by-step-preparation">A9 Step-by-step preparation</h2>
+<p>Follow these steps in order. Each has a concrete output so you can
+tell whether you are on track.</p>
+<ol type="1">
+<li><p><strong>Day 1: take a baseline.</strong> Solve two LeetCode
+Mediums in 45 minutes each, sketch one system design on paper, and write
+down every place you stalled. This list sets your weights, so adjust the
+plan to it.</p></li>
+<li><p><strong>Day 2: set up your toolkit.</strong> Practice in plain
+Java in a basic editor. Prepare a one-page template for fast input and
+common imports, and a collections cheat sheet: ArrayDeque, PriorityQueue
+with comparators, TreeMap, HashMap iteration, Arrays.sort with lambdas,
+StringBuilder.</p></li>
+<li><p><strong>Weeks 1-2: arrays, strings, hashing, binary search,
+stacks.</strong> Learn one pattern per day, then solve 5-8 problems on
+it. After each problem, note the pattern, the trigger phrase that
+reveals it, and the complexity. Re-solve anything that needed a hint
+after 3 days.</p></li>
+<li><p><strong>Weeks 3-4: trees, graphs, heaps, intervals,
+backtracking.</strong> Write BFS, DFS, topological sort, union-find and
+Dijkstra from memory until each takes under 5 minutes. Finish with 2
+timed mocks of two problems in 60 minutes.</p></li>
+<li><p><strong>Week 5: dynamic programming and Java
+concurrency.</strong> Do DP in the mornings (1D, then 2D, knapsack,
+string DP) and concurrency in the evenings: a thread-safe LRU cache, a
+bounded blocking queue and a token-bucket limiter. Read a real thread
+dump and GC log once.</p></li>
+<li><p><strong>Week 6: low-level design.</strong> Learn the seven
+patterns, then code one design every two days in 45 minutes: entities
+and interfaces first, then the core flow, then one extension. Keep each
+as a small Maven project with 2-3 unit tests.</p></li>
+<li><p><strong>Weeks 6-7: databases and messaging.</strong> For
+PostgreSQL, practice reading EXPLAIN ANALYZE, designing composite
+indexes and explaining isolation anomalies. For Kafka and Redis, build a
+small producer-consumer app with a dead-letter queue and a Redis-backed
+cache with TTL.</p></li>
+<li><p><strong>Week 7: high-level design.</strong> Do 8 designs from the
+table in A6, each on paper in 40 minutes with capacity math. Study Part
+B of this document alongside. Redo the weakest two a few days later and
+practice explaining one in 10 minutes.</p></li>
+<li><p><strong>Throughout: behavioral stories.</strong> Write 2 STAR
+stories per week until you have 6, each with a metric. Rehearse aloud,
+record yourself once, and trim each to 2 minutes.</p></li>
+<li><p><strong>Week 8: mocks and polish.</strong> Run 3 full loops
+(coding, LLD, HLD, behavioral) with a peer or a mock platform. Fix the
+top 3 recurring mistakes, such as skipping edge cases, forgetting
+complexity, or not stating trade-offs.</p></li>
+<li><p><strong>Interview day.</strong> Sleep well, test your setup for
+remote rounds, and think aloud. If stuck, state the brute force and ask
+a clarifying question rather than going silent. In design rounds, drive
+the conversation: requirements, numbers, diagram, deep dive,
+failures.</p></li>
+</ol>
+<h2 id="a10-resource-library">A10 Resource library</h2>
+<p>These are listed from general knowledge and the links were not opened
+while preparing this document, so check that each is still current
+before investing time.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 18%" />
+<col style="width: 41%" />
+<col style="width: 39%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Topic</strong></th>
+<th><strong>Resource</strong></th>
+<th><strong>Use it for</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Coding practice</strong></td>
+<td><a href="https://leetcode.com"><u>LeetCode (company-tagged
+lists)</u></a></td>
+<td>Timed Medium and Hard problems</td>
+</tr>
+<tr class="even">
+<td><strong>Coding practice</strong></td>
+<td><a href="https://neetcode.io"><u>NeetCode roadmap and NeetCode
+150</u></a></td>
+<td>Pattern-by-pattern order with video explanations</td>
+</tr>
+<tr class="odd">
+<td><strong>Coding practice</strong></td>
+<td>Cracking the Coding Interview (McDowell)</td>
+<td>Problem-solving process and classic questions</td>
+</tr>
+<tr class="even">
+<td><strong>Java core</strong></td>
+<td>Effective Java (Bloch)</td>
+<td>Idioms, equals and hashCode, immutability, generics</td>
+</tr>
+<tr class="odd">
+<td><strong>Java concurrency</strong></td>
+<td>Java Concurrency in Practice (Goetz)</td>
+<td>Memory model, locks, thread pools, safety</td>
+</tr>
+<tr class="even">
+<td><strong>Java concurrency</strong></td>
+<td><a href="https://www.baeldung.com/java-concurrency"><u>Baeldung:
+Java concurrency</u></a></td>
+<td>Short worked examples</td>
+</tr>
+<tr class="odd">
+<td><strong>JVM</strong></td>
+<td>Optimizing Java (Evans, Gough, Newland)</td>
+<td>GC, profiling, tuning</td>
+</tr>
+<tr class="even">
+<td><strong>Design patterns</strong></td>
+<td><a href="https://refactoring.guru/design-patterns"><u>Refactoring
+Guru: design patterns</u></a></td>
+<td>Pattern intent, structure, Java examples</td>
+</tr>
+<tr class="odd">
+<td><strong>Low-level design</strong></td>
+<td><a
+href="https://github.com/ashishps1/awesome-low-level-design"><u>Awesome
+Low Level Design</u></a></td>
+<td>Practice problems with Java solutions</td>
+</tr>
+<tr class="even">
+<td><strong>System design</strong></td>
+<td><a
+href="https://github.com/donnemartin/system-design-primer"><u>System
+Design Primer</u></a></td>
+<td>Fundamentals and sample designs</td>
+</tr>
+<tr class="odd">
+<td><strong>System design</strong></td>
+<td><a href="https://bytebytego.com"><u>ByteByteGo</u></a></td>
+<td>Visual walkthroughs of common designs</td>
+</tr>
+<tr class="even">
+<td><strong>System design</strong></td>
+<td><a href="https://www.hellointerview.com"><u>Hello
+Interview</u></a></td>
+<td>Structured design breakdowns and a delivery framework</td>
+</tr>
+<tr class="odd">
+<td><strong>System design</strong></td>
+<td><a
+href="https://github.com/binhnguyennus/awesome-scalability"><u>Awesome
+Scalability</u></a></td>
+<td>Real engineering articles on scale</td>
+</tr>
+<tr class="even">
+<td><strong>Distributed systems</strong></td>
+<td>Designing Data-Intensive Applications (Kleppmann)</td>
+<td>Replication, partitioning, transactions, streams</td>
+</tr>
+<tr class="odd">
+<td><strong>SQL performance</strong></td>
+<td><a href="https://use-the-index-luke.com"><u>Use The Index,
+Luke</u></a></td>
+<td>Index design and query tuning</td>
+</tr>
+<tr class="even">
+<td><strong>Kafka</strong></td>
+<td><a href="https://kafka.apache.org/documentation"><u>Apache Kafka
+documentation</u></a></td>
+<td>Partitions, consumer groups, delivery semantics</td>
+</tr>
+<tr class="odd">
+<td><strong>Redis</strong></td>
+<td><a href="https://redis.io/docs"><u>Redis documentation</u></a></td>
+<td>Data types, persistence, eviction, cluster</td>
+</tr>
+<tr class="even">
+<td><strong>Kubernetes</strong></td>
+<td><a href="https://kubernetes.io/docs/tutorials"><u>Kubernetes
+tutorials</u></a></td>
+<td>Pods, deployments, probes, scaling</td>
+</tr>
+<tr class="odd">
+<td><strong>Reliability</strong></td>
+<td><a href="https://sre.google/sre-book/table-of-contents/"><u>Google
+SRE book</u></a></td>
+<td>SLOs, alerting, incident handling</td>
+</tr>
+<tr class="even">
+<td><strong>Behavioral</strong></td>
+<td><a href="https://www.amazon.jobs/en/principles"><u>Amazon Leadership
+Principles</u></a></td>
+<td>The framework Coupang's loop is reported to mirror</td>
+</tr>
+<tr class="odd">
+<td><strong>Company</strong></td>
+<td>Coupang engineering blog and recent news</td>
+<td>Context for design answers and 'why Coupang'</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="a11-final-week-checklist-and-sources">A11 Final-week checklist
+and sources</h2>
+<ul>
+<li><p>Re-solve your 20 weakest problems without notes.</p></li>
+<li><p>Rehearse 4 system designs aloud, with capacity math.</p></li>
+<li><p>Code 2 low-level designs end to end in 45 minutes.</p></li>
+<li><p>Rehearse all 6 STAR stories with metrics, timed at 2
+minutes.</p></li>
+<li><p>Prepare 5 questions for interviewers (team scale, on-call,
+technical roadmap).</p></li>
+<li><p>Confirm round formats and language options with the
+recruiter.</p></li>
+</ul>
+<p>Sources and caveats. The loop structure, technology stack and round
+contents come from public interview guides (Revarta, PracHub, TechPrep,
+CodeJeet, Calibrd, AmbitionBox) as summarized in the guide you shared. I
+did not open or independently verify those pages. The topic lists,
+problem examples and time splits are general interview-preparation
+recommendations, so confirm the actual rounds with your recruiter.</p>
+<footer class="foot">Prepared for Hari. Model answers are general guidance; confirm the actual Coupang round formats with your recruiter.</footer>
+</main>
+<script src="../assets/script.js"></script>
+</body>
+</html>
